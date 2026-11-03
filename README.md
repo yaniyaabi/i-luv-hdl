@@ -2,55 +2,71 @@
 
 커피 한 잔과 함께 머무는 온라인 집중 카페.
 
+[카페 입장하기](https://yaniyaabi.github.io/i-luv-hdl/)
+
 ## 기능
 
 - 눈 내리는 입장 화면과 카페 문종 소리
 - 커피·말차·핫초콜릿·토스트 선택, 영어 원두 목록
 - 25·45·60분 / 무제한 집중 타이머
-- 같은 방 번호로 입장, 입장·주문 알림, 전체 채팅과 귓속말
+- 같은 방 번호로 입장, 접속자·입장·주문 알림
+- 실시간 전체 채팅과 당사자만 읽을 수 있는 귓속말
 - YouTube 공식 플레이어 사운드 선택
 - 쿠키 사이트 아이콘과 별 모양 커서
 
-## 홈페이지
+## 운영 구조
 
-https://yaniyaabi.github.io/i-luv-hdl/
+화면은 **GitHub Pages**, 방·접속자·채팅은 소유자의 **Firebase Spark 무료 프로젝트**에서 운영합니다. ChatGPT Sites, ChatGPT 로그인, Workers/D1 서버에 의존하지 않습니다. 노트북을 켜둘 필요가 없습니다.
 
-GitHub Pages는 기존 서비스로 연결되는 진입 주소입니다.
-실제 카페와 채팅 서버: https://slow-room-soohyun.yaniyaabi.chatgpt.site/
-현재 서비스의 접근 권한은 그대로 유지됩니다.
+방 번호를 비워두면 Firebase 로그인 없이 혼자 타이머를 이용합니다. 같은 번호를 입력한 손님은 Firebase 익명 인증으로 구분합니다. 회원가입 화면은 없으며, 각 페이지의 세션을 별도 손님으로 취급합니다. 방 번호는 친구와 공유하는 입장 코드이며 비밀번호나 비공개 초대 링크를 대체하지 않습니다.
 
 ## 로컬 개발
 
-Node.js 22.13 이상이 필요합니다.
+Node.js 24 LTS를 권장합니다.
 
 ~~~sh
-npm run install:ci
-npm run build
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_happy_mockingbird.sql
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_easy_lenny_balinger.sql
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_amazing_drax.sql
+npm ci
 npm run dev
 ~~~
 
-개발 서버: http://127.0.0.1:5173/
+개발 서버는 명령어에 표시된 로컬 주소에서 열립니다. 로컬 개발도 설정된 Firebase 프로젝트에 연결됩니다.
 
-로컬 로그인: http://127.0.0.1:5173/signin-with-chatgpt?return_to=/
+~~~sh
+npm run build
+npm run preview
+~~~
 
-SQL 초기화 명령은 새 로컬 데이터베이스에 처음 한 번만 실행합니다.
-로컬의 테스트 로그인과 데이터베이스는 실제 서비스와 분리되어 있습니다.
+GitHub Pages의 하위 경로 빌드는 VITE_BASE_PATH=/i-luv-hdl/ 환경변수를 지정합니다. main 브랜치에 push하면 GitHub Actions가 빌드·배포합니다.
 
-## 구성
+## Firebase
 
-- React + TypeScript + Vinext/Vite
-- Cloudflare Workers + D1
-- app/page.tsx: 카페 화면과 타이머
-- components/room-chat.tsx: 게임형 채팅 UI
-- components/music-player.tsx: 공식 YouTube 플레이어
-- app/api/room/route.ts: 입장·상태·메시지 API
-- db/schema.ts, drizzle/: 데이터베이스와 마이그레이션
+- 프로젝트: i-luv-hdl, Spark 무료 요금제
+- Authentication: 익명 제공업체
+- Realtime Database: 싱가포르(asia-southeast1)
+- lib/firebase-config.ts: 공개용 웹 앱 설정
+- lib/firebase-room.ts: 입장, 실시간 구독, 메시지, 접속 종료·재연결
+- database.rules.json: 멤버별 쓰기 권한, 방 격리, 귓속말 수신함 보호, 입력 검증
 
-GitHub Pages는 정적 사이트 호스팅입니다. 방·채팅 API는 별도의 Workers 서버가 필요합니다.
-현재 .openai/hosting.json은 기존 Sites 배포에 연결되어 있습니다.
+Firebase 웹 설정은 비밀 관리자 키가 아닙니다. 실제 접근 권한은 Database Rules에서 검사합니다. 서비스 계정 키나 관리자 토큰을 프런트엔드에 넣지 않습니다. 규칙 변경은 Firebase 콘솔에서 database.rules.json과 동일하게 게시하거나, 소유자 계정으로 Firebase CLI에 로그인 후 아래 명령어를 실행합니다.
+
+~~~sh
+npx firebase-tools deploy --only database --project i-luv-hdl
+~~~
+
+Spark 무료 한도는 동시 연결 100개, 저장 1GB, 월 다운로드 10GB입니다. 무료 한도에 도달하면 기능이 제한될 수 있습니다. 요금제를 업그레이드하지 않는 한 사용량 초과로 자동 과금되지 않습니다. [공식 요금표](https://firebase.google.com/pricing)
+
+현재 대화는 최근 100개까지 표시하며 데이터베이스에 저장합니다. 자동 삭제 작업은 없으므로 오래된 방 기록은 Firebase 콘솔에서 관리할 수 있습니다. 브라우저를 닫으면 서버의 onDisconnect로 접속자를 정리하며, 인터넷이 끊겼다가 연결되면 입장 상태와 채팅 구독을 복구합니다.
+
+## 검증
+
+다음 검증은 실제 Firebase 프로젝트에 일회성 익명 계정과 임의의 테스트 방을 만든 후 자신이 만든 데이터와 계정을 정리합니다. 관리자 자격 증명은 사용하지 않습니다.
+
+~~~sh
+node scripts/test-firebase.mjs
+node scripts/test-firebase-client.mjs
+~~~
+
+규칙 검증은 방 격리, 귓속말 읽기 제한, 발신자 사칭·다른 사람의 프로필 수정·메시지 변조 거부를 확인합니다. 클라이언트 검증은 두 독립 세션 간 실시간 전송, 중복 전송 방지, 접속 종료 정리, 재연결 후 채팅을 확인합니다.
 
 ## 이미지·사운드
 

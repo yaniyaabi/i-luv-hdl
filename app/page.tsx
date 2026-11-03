@@ -3,8 +3,9 @@ import {useState,useEffect,useRef} from 'react';
 import MusicPlayer,{soundtracks} from '../components/music-player';
 import RoomChat,{type RoomMessage,type Person} from '../components/room-chat';
 import {menu as drinks} from '../lib/cafe';
+import {connectRoom,roomError,type CafeRoom} from '../lib/firebase-room';
 import {ArrowLeft,ArrowRight,Volume2,VolumeX,Play,Pause,Square,Users,Copy,LogOut,X,Settings2,Headphones} from 'lucide-react';
-const root='/reference/';
+const root=import.meta.env.BASE_URL+'reference/';
 
 
 const beans=['Panama Geisha','Hawaiian Kona','Ethiopia Guji','Ethiopia Yirgacheffe Aricha','Ethiopia Yirgacheffe Koke Honey'];
@@ -15,22 +16,26 @@ export default function Home(){
  const [step,setStep]=useState('entry'),[drinkIndex,setDrinkIndex]=useState(0),[picked,setPicked]=useState(false),[bean,setBean]=useState(beans[0]),[tea,setTea]=useState(teas[0]),[duration,setDuration]=useState(25),[name,setName]=useState(''),[task,setTask]=useState(''),[code,setCode]=useState(''),[joined,setJoined]=useState(false),[people,setPeople]=useState<Person[]>([]),[messages,setMessages]=useState<RoomMessage[]>([]),[seconds,setSeconds]=useState(1500),[running,setRunning]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[drawer,setDrawer]=useState(false),[soundIndex,setSoundIndex]=useState(-1),[copied,setCopied]=useState(false);
  const doorBell=useRef<HTMLAudioElement|null>(null);
  const id=useRef('');
+ const room=useRef<CafeRoom|null>(null);
  const isCoffee=drinks[drinkIndex].coffee,isTea=false,drink=drinks[drinkIndex].name+(isCoffee?' · '+bean:'');
- useEffect(()=>{id.current=sessionStorage.getItem('cafe-visitor-id')||crypto.randomUUID();sessionStorage.setItem('cafe-visitor-id',id.current);return()=>{}},[]);
+ useEffect(()=>()=>{void room.current?.close().catch(()=>{})},[]);
  useEffect(()=>{
-  const bell=new Audio('/audio/cafe-door-bell.mp3');bell.preload='auto';bell.volume=.65;bell.load();doorBell.current=bell;
+  const bell=new Audio(import.meta.env.BASE_URL+'audio/cafe-door-bell.mp3');bell.preload='auto';bell.volume=.65;bell.load();doorBell.current=bell;
   return()=>{bell.pause();doorBell.current=null};
  },[]);
 
- async function sync(action='heartbeat',message?:{body:string,recipient:string,messageId:string}){
-  const r=await fetch('/api/room',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id.current,code,name:name.trim()||'guest',drink,space:0,action,...message})});
-  const b=await r.json() as {error?:string,people:Person[],messages:RoomMessage[]};if(!r.ok)throw Error(b.error||'다시 시도해주세요.');
-  if(action!=='leave'){setPeople(b.people);setMessages(b.messages);setError('')}return b;
+ async function join(){
+  if(room.current)await room.current.close();
+  const client=await connectRoom({code,name:name.trim()||'guest',drink,onPeople:setPeople,onMessages:setMessages,onStatus:setError});
+  id.current=client.id;room.current=client;setJoined(true);setError('');
  }
- useEffect(()=>{if(!joined||step!=='room')return;let pending=false;const t=setInterval(async()=>{if(pending)return;pending=true;try{await sync()}catch(e:any){setError(e.message)}finally{pending=false}},2000);return()=>clearInterval(t)},[joined,code,name,drink,step]);
  useEffect(()=>{if(!running)return;const t=setInterval(()=>setSeconds(s=>{if(duration===0)return s+1;if(s<=1){setRunning(false);return 0}return s-1}),1000);return()=>clearInterval(t)},[running,duration]);
- async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code){await sync('join');setJoined(true)}setSeconds(duration*60);setRunning(true);setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
- async function leave(){try{if(joined)await sync('leave');setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRunning(false);setStep('drink')}catch(e:any){setError(e.message)}}
+ async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code)await join();setSeconds(duration*60);setRunning(true);setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ async function leave(){
+  const client=room.current;room.current=null;
+  setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRunning(false);setStep('drink');setError('');
+  if(client)void client.close().catch(e=>setError(roomError(e)));
+ }
  function enterCafe(){
   const bell=doorBell.current;
   if(bell){bell.currentTime=0;bell.play().catch(()=>{});}
@@ -52,10 +57,10 @@ export default function Home(){
  <button className="space-label" onClick={()=>setDrawer(true)}>커피숍{joined?' · '+code:''}</button>
  <div className="focus-content"><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<Cup index={drinkIndex} className="hero-cup"/>{isCoffee&&<span className="bean-caption">{bean}</span>}</div>
  <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0&&duration!==0){setSeconds(duration*60);}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>{setRunning(false);setSeconds(duration*60);}}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&duration!==0&&<span role="status" className="done">잘했어요. 잠시 쉬어갈까요?</span>}</div>
- </section><RoomChat joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{await sync('message',{body,recipient,messageId})}}/>
+ </section><RoomChat joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{if(!room.current)throw Error('방에 먼저 입장해주세요.');await room.current.send(body,recipient,messageId)}}/>
  {soundIndex>=0&&<MusicPlayer key={soundIndex} index={soundIndex} onClose={()=>setSoundIndex(-1)}/>}
  {error&&<div role="alert" className="room-error">{error}</div>}
- {drawer&&<div className="drawer-backdrop" onClick={()=>setDrawer(false)}><section className="drawer" onClick={e=>e.stopPropagation()}><button className="close" aria-label="닫기" onClick={()=>setDrawer(false)}><X/></button><h2>make yourself at home.</h2><p className="drawer-sub">커피 한 잔, 나의 속도로.</p><h3>background sound</h3><div className="youtube-track-list">{soundtracks.map((track,i)=><button key={track.id} aria-pressed={soundIndex===i} className={soundIndex===i?'chosen':''} onClick={()=>{if(track.externalOnly){window.open('https://www.youtube.com/watch?v='+track.id,'_blank','noopener,noreferrer');return}setSoundIndex(i);setDrawer(false)}}><span className="track-number">0{i+1}</span><span><strong>{track.name}</strong><small>{track.detail}{track.externalOnly?' · 외부 재생 제한':''}</small></span><span>{track.externalOnly?'YouTube ↗':soundIndex===i?'✓':'↗'}</span></button>)}</div><p className="sound-player-note">YouTube 공식 플레이어에서 재생해요.<br/>모든 영상은 처음부터 시작합니다.<br/>2·4번은 외부 재생 제한으로 YouTube에서 열려요.</p>{soundIndex>=0&&<button className="stop-youtube" onClick={()=>setSoundIndex(-1)}>재생 종료</button>}<h3>together, in the same room.</h3>{joined?<><div className="room-number"><span>ROOM {code}</span><button aria-label="방 번호 복사" onClick={async()=>{try{await navigator.clipboard.writeText(code);setCopied(true)}catch{setError('방 번호를 직접 복사해주세요.')}}}><Copy size={16}/></button></div><p className="tiny-note">{copied?'번호를 복사했어요.':'친구에게 이 번호를 알려주세요.'} · {people.length}명 접속 중</p><div className="drawer-people">{people.map(p=><p key={p.id}><Users size={14}/>{p.name}<small>{p.drink}</small></p>)}</div></>:<form className="join-form" onSubmit={async e=>{e.preventDefault();setBusy(true);try{await sync('join');setJoined(true)}catch(e:any){setError(e.message)}finally{setBusy(false)}}}><label>방 번호<input aria-label="함께할 방 번호" required pattern="[0-9]{4,8}" maxLength={8} inputMode="numeric" placeholder="숫자 4~8자리" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label><button className="black" disabled={busy}>{busy?'opening…':'함께 입장하기'}</button></form>}{error&&<p className="error" role="alert">{error}</p>}<button className="leave" onClick={leave}><LogOut size={16}/>{joined?'방 나가기':'처음으로'}</button></section></div>}
+ {drawer&&<div className="drawer-backdrop" onClick={()=>setDrawer(false)}><section className="drawer" onClick={e=>e.stopPropagation()}><button className="close" aria-label="닫기" onClick={()=>setDrawer(false)}><X/></button><h2>make yourself at home.</h2><p className="drawer-sub">커피 한 잔, 나의 속도로.</p><h3>background sound</h3><div className="youtube-track-list">{soundtracks.map((track,i)=><button key={track.id} aria-pressed={soundIndex===i} className={soundIndex===i?'chosen':''} onClick={()=>{if(track.externalOnly){window.open('https://www.youtube.com/watch?v='+track.id,'_blank','noopener,noreferrer');return}setSoundIndex(i);setDrawer(false)}}><span className="track-number">0{i+1}</span><span><strong>{track.name}</strong><small>{track.detail}{track.externalOnly?' · 외부 재생 제한':''}</small></span><span>{track.externalOnly?'YouTube ↗':soundIndex===i?'✓':'↗'}</span></button>)}</div><p className="sound-player-note">YouTube 공식 플레이어에서 재생해요.<br/>모든 영상은 처음부터 시작합니다.<br/>2·4번은 외부 재생 제한으로 YouTube에서 열려요.</p>{soundIndex>=0&&<button className="stop-youtube" onClick={()=>setSoundIndex(-1)}>재생 종료</button>}<h3>together, in the same room.</h3>{joined?<><div className="room-number"><span>ROOM {code}</span><button aria-label="방 번호 복사" onClick={async()=>{try{await navigator.clipboard.writeText(code);setCopied(true)}catch{setError('방 번호를 직접 복사해주세요.')}}}><Copy size={16}/></button></div><p className="tiny-note">{copied?'번호를 복사했어요.':'친구에게 이 번호를 알려주세요.'} · {people.length}명 접속 중</p><div className="drawer-people">{people.map(p=><p key={p.id}><Users size={14}/>{p.name}<small>{p.drink}</small></p>)}</div></>:<form className="join-form" onSubmit={async e=>{e.preventDefault();setBusy(true);try{await join()}catch(e:any){setError(e.message)}finally{setBusy(false)}}}><label>방 번호<input aria-label="함께할 방 번호" required pattern="[0-9]{4,8}" maxLength={8} inputMode="numeric" placeholder="숫자 4~8자리" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label><button className="black" disabled={busy}>{busy?'opening…':'함께 입장하기'}</button></form>}{error&&<p className="error" role="alert">{error}</p>}<button className="leave" onClick={leave}><LogOut size={16}/>{joined?'방 나가기':'처음으로'}</button></section></div>}
  </main>
 }
 
