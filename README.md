@@ -11,9 +11,13 @@
 - YouTube 공식 플레이어 사운드 선택
 - 쿠키 사이트 아이콘과 별 모양 커서
 
-## 실행 중인 서비스
+## 홈페이지
 
-https://slow-room-soohyun.yaniyaabi.chatgpt.site/
+https://yaniyaabi.github.io/i-luv-hdl/
+
+GitHub Pages는 기존 서비스로 연결되는 진입 주소입니다.
+실제 카페와 채팅 서버: https://slow-room-soohyun.yaniyaabi.chatgpt.site/
+현재 서비스의 접근 권한은 그대로 유지됩니다.
 
 ## 로컬 개발
 
@@ -22,7 +26,9 @@ Node.js 22.13 이상이 필요합니다.
 ~~~sh
 npm run install:ci
 npm run build
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 migrations apply DB --local --config dist/server/wrangler.json --persist-to .wrangler/state
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_happy_mockingbird.sql
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_easy_lenny_balinger.sql
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_amazing_drax.sql
 npm run dev
 ~~~
 
@@ -30,6 +36,7 @@ npm run dev
 
 로컬 로그인: http://127.0.0.1:5173/signin-with-chatgpt?return_to=/
 
+SQL 초기화 명령은 새 로컬 데이터베이스에 처음 한 번만 실행합니다.
 로컬의 테스트 로그인과 데이터베이스는 실제 서비스와 분리되어 있습니다.
 
 ## 구성
