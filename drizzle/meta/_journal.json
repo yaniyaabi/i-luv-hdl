@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793687146184,
+      "tag": "0000_happy_mockingbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793689979958,
+      "tag": "0001_easy_lenny_balinger",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793691338199,
+      "tag": "0002_amazing_drax",
+      "breakpoints": true
+    }
+  ]
+}
