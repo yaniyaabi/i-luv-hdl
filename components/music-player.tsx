@@ -5,7 +5,10 @@ export const soundtracks=[
  {id:'b78FLPvTOvk',name:'집에서 듣는 카페 소리',detail:'카페 ASMR · 스터디윗미'},
  {id:'0nNcqgLwO4I',name:'비 오는 뉴욕 커피숍',detail:'Rain · coffee shop ambience'},
  {id:'180ysvIh6kU',name:'비 오는 뉴욕 대학교',detail:'감성 playlist'},
- {id:'io-OiuM--fo',name:'내가 신채경이면 좋겠다',detail:'박퀴벌 · playlist'}
+ {id:'io-OiuM--fo',name:'내가 신채경이면 좋겠다',detail:'박퀴벌 · playlist'},
+ {id:'woKx5_S1wmk',name:'그때 그 시절 카세트테이프',detail:'박퀴벌 · playlist'},
+ {id:'v3LRwxfAiNU',name:'그 시절 크리스마스 K-캐롤',detail:'체리쥬 · 90년대생 playlist',external:true},
+ {id:'b8fpjC60V2E',name:'시끄럽지 않은 그 시절 노동요',detail:'여니킥 · 2000년대 playlist',external:true}
 ];
 type Position={x:number,y:number};
 const positionKey='hdl-music-position';

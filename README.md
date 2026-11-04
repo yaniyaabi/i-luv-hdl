@@ -79,4 +79,4 @@ node scripts/test-firebase-client.mjs
 사용자 제공 사진과 배경 제거 이미지, cafe.pauwee.com 참고 이미지가 포함되어 있습니다.
 각 이미지 및 로고의 권리는 원저작자에게 있습니다.
 문종: Joseph SARDIN / BigSoundBank, CC0. 상세 출처는 public/audio/CREDITS.txt.
-YouTube 영상은 다운로드하거나 추출하지 않고 공식 플레이어로 재생합니다.
+YouTube 영상은 다운로드하거나 추출하지 않고 공식 플레이어로 재생합니다. 외부 재생이 제한된 영상은 목록에 YouTube에서 듣기로 표시하며, 선택하면 기존 플레이어를 종료하고 새 탭에서 처음부터 엽니다.
