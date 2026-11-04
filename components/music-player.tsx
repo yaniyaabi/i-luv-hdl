@@ -4,7 +4,8 @@ import {X,ExternalLink,Minus,Maximize2,GripHorizontal} from 'lucide-react';
 export const soundtracks=[
  {id:'b78FLPvTOvk',name:'집에서 듣는 카페 소리',detail:'카페 ASMR · 스터디윗미'},
  {id:'0nNcqgLwO4I',name:'비 오는 뉴욕 커피숍',detail:'Rain · coffee shop ambience'},
- {id:'180ysvIh6kU',name:'비 오는 뉴욕 대학교',detail:'감성 playlist'}
+ {id:'180ysvIh6kU',name:'비 오는 뉴욕 대학교',detail:'감성 playlist'},
+ {id:'io-OiuM--fo',name:'내가 신채경이면 좋겠다',detail:'박퀴벌 · playlist'}
 ];
 type Position={x:number,y:number};
 const positionKey='hdl-music-position';
