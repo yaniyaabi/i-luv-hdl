@@ -68,3 +68,14 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 .room-drinks-shared .room-drink-fallback{display:grid!important;place-items:center;font-size:66px}
 @media(max-height:760px) and (min-width:761px){.with-chat .has-company .big-clock{font-size:96px}.with-chat .has-company .guest-name{margin-top:8px}.with-chat .room-drinks-shared .shared-drink-cup{height:145px}}
 @media(max-width:760px){.with-chat .focus-content.has-company{top:18%}.with-chat .has-company .big-clock{font-size:74px}.room-drinks-shared{gap:12px;margin-top:8px;max-width:100%;padding:2px 4px 8px}.room-drinks-shared .room-drink{width:126px}.with-chat .room-drinks-shared .shared-drink-cup{width:122px;height:100px}.shared-drink-details{font-size:9px;margin-top:6px;gap:2px}.shared-drink-details strong{font-size:11px}.shared-drink-details small{font-size:8px;padding:2px 4px}}
+/* A shared white desk grounds the drinks without covering the cafe controls. */
+.cafe-desk{--desk-top:150px;--desk-depth:96px;--desk-leg-height:42px;position:relative;isolation:isolate;display:flex;justify-content:center;align-items:flex-start;width:max-content;min-width:min(420px,100%);max-width:100%;padding:0 46px}
+.desk-structure{position:absolute;inset:0;z-index:0;pointer-events:none}
+.desk-surface{position:absolute;left:0;right:0;top:var(--desk-top);height:var(--desk-depth);z-index:2;border:1px solid #dce0d7;border-radius:10px 10px 14px 14px;background:#fff;transform:perspective(650px) rotateX(35deg);box-shadow:0 7px 0 #e8eae4,0 8px 0 #d9ddd4,0 17px 23px #35422a12}
+.desk-leg{position:absolute;top:calc(var(--desk-top) + var(--desk-depth) - 15px);height:var(--desk-leg-height);width:16px;z-index:1;border:1px solid #d8dcd3;border-top:0;border-radius:0 0 4px 4px;background:linear-gradient(90deg,#eef0e9,#fff 40%,#fafbf8);box-shadow:2px 3px 4px #35422a08}
+.desk-leg-left{left:12%;transform:skewX(-4deg)}
+.desk-leg-right{right:12%;transform:skewX(4deg)}
+.cafe-desk>.room-drinks{position:relative;z-index:1;min-width:0}
+.cafe-desk-shared{--desk-top:92px;--desk-depth:82px;--desk-leg-height:42px;padding:0 42px}
+@media(max-height:760px) and (min-width:761px){.cafe-desk-shared{--desk-top:78px;--desk-depth:78px}}
+@media(max-width:760px){.cafe-desk{--desk-top:89px;--desk-depth:61px;--desk-leg-height:32px;min-width:min(300px,100%);padding:0 18px}.desk-surface{border-radius:7px 7px 10px 10px;box-shadow:0 5px 0 #e8eae4,0 6px 0 #d9ddd4,0 12px 16px #35422a10}.desk-leg{width:11px}.cafe-desk-shared{--desk-top:52px;--desk-depth:62px;--desk-leg-height:34px;padding:0 14px}}
