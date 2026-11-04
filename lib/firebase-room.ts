@@ -6,9 +6,9 @@ import type {Person,RoomMessage} from '../components/room-chat';
 
 const app=initializeApp(firebaseConfig);
 const auth=initializeAuth(app,{persistence:inMemoryPersistence});
-const db=getDatabase(app);
+export const db=getDatabase(app);
 let login:Promise<string>|undefined;
-function visitor(){
+export function visitor(){
   return login ??= signInAnonymously(auth).then(({user})=>user.uid).catch(error=>{login=undefined;throw error});
 }
 type Profile={name:string,drink:string,joinedAt:number};

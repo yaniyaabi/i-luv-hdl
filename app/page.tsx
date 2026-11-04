@@ -3,6 +3,7 @@ import {useState,useEffect,useRef} from 'react';
 import MusicPlayer,{soundtracks} from '../components/music-player';
 import RoomChat,{type RoomMessage,type Person} from '../components/room-chat';
 import RoomDrinks from '../components/room-drinks';
+import MemeGotgan from '../components/meme-gotgan';
 import {menu as drinks,matchas} from '../lib/cafe';
 import {connectRoom,roomError,type CafeRoom} from '../lib/firebase-room';
 import {ArrowLeft,ArrowRight,Volume2,VolumeX,Play,Pause,Square,Users,Copy,LogOut,X,Settings2,Headphones} from 'lucide-react';
@@ -15,6 +16,7 @@ function Cup({index,className=''}:{index:number,className?:string}){return <img 
 export default function Home(){
  const [step,setStep]=useState('entry'),[drinkIndex,setDrinkIndex]=useState(0),[picked,setPicked]=useState(false),[bean,setBean]=useState(beans[0]),[matcha,setMatcha]=useState(matchas[0]),[duration,setDuration]=useState(25),[name,setName]=useState(''),[task,setTask]=useState(''),[code,setCode]=useState(''),[joined,setJoined]=useState(false),[people,setPeople]=useState<Person[]>([]),[messages,setMessages]=useState<RoomMessage[]>([]),[seconds,setSeconds]=useState(1500),[running,setRunning]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[drawer,setDrawer]=useState(false),[soundIndex,setSoundIndex]=useState(-1),[copied,setCopied]=useState(false);
  const [receivedCount,setReceivedCount]=useState(0);
+ const [view,setView]=useState<'focus'|'memes'>('focus');
  const doorBell=useRef<HTMLAudioElement|null>(null);
  const id=useRef('');
  const room=useRef<CafeRoom|null>(null);
@@ -37,7 +39,7 @@ export default function Home(){
   id.current=client.id;room.current=client;setJoined(true);setError('');
  }
  useEffect(()=>{if(!running)return;const t=setInterval(()=>setSeconds(s=>{if(duration===0)return s+1;if(s<=1){setRunning(false);return 0}return s-1}),1000);return()=>clearInterval(t)},[running,duration]);
- async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code)await join();setSeconds(duration*60);setRunning(true);setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code)await join();setSeconds(duration*60);setRunning(true);setView('focus');setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  async function leave(){
   const client=room.current;room.current=null;
   setReceivedCount(0);setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRunning(false);setStep('drink');setError('');
@@ -61,9 +63,10 @@ export default function Home(){
  {step==='timer'&&<><Cup index={drinkIndex} className="tiny-cup"/><h1 className="sr-only">집중 시간 선택</h1><div className="duration-list">{durations.map((m,i)=><button key={m} aria-pressed={duration===m} className={duration===m?'chosen':''} onClick={()=>setDuration(m)}><span>{['tall','grande','venti','unlimited'][i]}</span><i/><span>{m===0?'∞':m+' minutes'}</span></button>)}</div><Next onClick={()=>setStep('name')}/><Back onClick={()=>setStep(isCoffee||isMatcha?'bean':'drink')}/></>}
  {step==='name'&&<form onSubmit={start} className="name-form"><div className="receipt"><p>DRINK FOR</p><input aria-label="닉네임" maxLength={16} placeholder="your name" value={name} onChange={e=>setName(e.target.value)}/><span>1X {duration===0?'UNLIMITED':duration+' MIN'} {drinks[drinkIndex].name.toUpperCase()}</span>{selection&&<span>{selection}</span>}<span>ORDER #{code||'001'}</span><div className="perforation"/><label>ROOM NUMBER <small>같은 번호를 입력하면 함께 입장해요.</small><input aria-label="방 번호" inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} placeholder="숫자 4~8자리 · 혼자라면 비워두세요" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label><label className="task-label">I WILL...<input aria-label="오늘 할 일" placeholder="오늘 집중할 일 (선택)" maxLength={80} value={task} onChange={e=>setTask(e.target.value)}/></label></div><button className="black next" disabled={busy} type="submit">{busy?'opening…':'start'}</button>{error&&<p role="alert" className="error">{error}</p>}<Back onClick={()=>setStep('timer')}/></form>}
  </div><span className="ordering-foot">sip, breathe, and take your time.</span></main>;
- return <main className="immersive with-chat">
- <section className="focus-stage"><img className="room-bg" src={root+'focus-bg.png'} alt="손그림 카페 공간"/>
- <span className="view-label focus-label">focus</span>
+ return <main className={'immersive with-chat '+(view==='memes'?'meme-view':'')}>
+ <nav className="room-tabs" role="tablist" aria-label="카페 탭" onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'focus':event.key==='End'?'memes':view==='focus'?'memes':'focus';setView(next);event.currentTarget.querySelector<HTMLButtonElement>('#'+(next==='focus'?'focus-tab':'meme-tab'))?.focus()}}}><button role="tab" id="focus-tab" aria-controls="focus-panel" aria-selected={view==='focus'} tabIndex={view==='focus'?0:-1} onClick={()=>setView('focus')}>focus</button><button role="tab" id="meme-tab" aria-controls="meme-panel" aria-selected={view==='memes'} tabIndex={view==='memes'?0:-1} onClick={()=>setView('memes')}>meme gotgan</button></nav>
+ {view==='memes'&&<MemeGotgan name={name}/> }
+ <section className="focus-stage" id="focus-panel" role="tabpanel" aria-labelledby="focus-tab" hidden={view!=='focus'}><img className="room-bg" src={root+'focus-bg.png'} alt="손그림 카페 공간"/>
  <button className="space-label" onClick={()=>setDrawer(true)}>커피숍{joined?' · '+code:''}</button>
  <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomDrinks ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownSelection={selection||undefined} friends={friends}/></div>
  <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0&&duration!==0){setSeconds(duration*60);}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>{setRunning(false);setSeconds(duration*60);}}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&duration!==0&&<span role="status" className="done">잘했어요. 잠시 쉬어갈까요?</span>}</div>

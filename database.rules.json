@@ -30,7 +30,7 @@
           ],
           "$id": {
             ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && ((!newData.exists() && data.child('sender').val() === auth.uid) || (!data.exists() && newData.child('sender').val() === auth.uid))",
-            ".validate": "newData.hasChildren([\"kind\", \"sender\", \"senderName\", \"recipient\", \"recipientName\", \"body\", \"created\"])",
+            ".validate": "newData.hasChildren(['kind','sender','senderName','recipient','recipientName','body','created'])",
             "kind": {
               ".validate": "newData.val() === 'chat'"
             },
@@ -66,7 +66,7 @@
             ],
             "$id": {
               ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && ((!newData.exists() && data.child('sender').val() === auth.uid) || (!data.exists() && newData.child('sender').val() === auth.uid && ($uid === auth.uid || $uid === newData.child('recipient').val()) && root.child('rooms').child($code).child('members').child(newData.child('recipient').val()).exists()))",
-              ".validate": "newData.hasChildren([\"kind\", \"sender\", \"senderName\", \"recipient\", \"recipientName\", \"body\", \"created\"])",
+              ".validate": "newData.hasChildren(['kind','sender','senderName','recipient','recipientName','body','created'])",
               "kind": {
                 ".validate": "newData.val() === 'chat'"
               },
@@ -97,6 +97,33 @@
         },
         "$other": {
           ".validate": false
+        }
+      }
+    },
+    "memeComments": {
+      "$memeId": {
+        ".read": "auth != null && $memeId.matches(/^(boss-energy|study-fire|princess|commute|success-2026)$/) && query.orderByChild === 'created' && query.limitToLast > 0 && query.limitToLast <= 100",
+        ".indexOn": [
+          "created"
+        ],
+        "$id": {
+          ".write": "auth != null && $memeId.matches(/^(boss-energy|study-fire|princess|commute|success-2026)$/) && $id.matches(/^[A-Za-z0-9_-]{20,64}$/) && ((!data.exists() && newData.child('authorId').val() === auth.uid) || (!newData.exists() && data.child('authorId').val() === auth.uid))",
+          ".validate": "newData.hasChildren(['authorId','authorName','body','created'])",
+          "authorId": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "authorName": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16"
+          },
+          "body": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+          },
+          "created": {
+            ".validate": "newData.isNumber() && newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
         }
       }
     }

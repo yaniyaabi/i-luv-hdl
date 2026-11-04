@@ -31,7 +31,7 @@ export default function RoomChat({joined,code,me,name,people,messages,receivedCo
  useEffect(()=>{
   const key=(e:KeyboardEvent)=>{
    const el=e.target as HTMLElement;
-   if(el.closest('input,textarea,select,[contenteditable=true]'))return;
+   if(el.closest('input,textarea,select,button,a,[role=dialog],[contenteditable=true]'))return;
    if(e.key==='Enter'&&joined&&!e.ctrlKey&&!e.altKey&&!e.metaKey){e.preventDefault();setMinimized(false);setActive(true);setTimeout(()=>input.current?.focus(),0)}
    if(e.key==='Escape'){setActive(false);setShowPeople(false)}
   };
