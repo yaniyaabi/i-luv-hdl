@@ -79,3 +79,4 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 .cafe-desk-shared{--desk-top:92px;--desk-depth:82px;--desk-leg-height:42px;padding:0 42px}
 @media(max-height:760px) and (min-width:761px){.cafe-desk-shared{--desk-top:78px;--desk-depth:78px}}
 @media(max-width:760px){.cafe-desk{--desk-top:89px;--desk-depth:61px;--desk-leg-height:32px;min-width:min(300px,100%);padding:0 18px}.desk-surface{border-radius:7px 7px 10px 10px;box-shadow:0 5px 0 #e8eae4,0 6px 0 #d9ddd4,0 12px 16px #35422a10}.desk-leg{width:11px}.cafe-desk-shared{--desk-top:52px;--desk-depth:62px;--desk-leg-height:34px;padding:0 14px}}
+@media(min-aspect-ratio:2/1) and (min-width:1101px){.cafe-desk-solo{--desk-top:96px;--desk-depth:72px;--desk-leg-height:36px;min-width:min(360px,100%)}}
