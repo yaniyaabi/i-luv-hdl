@@ -10,9 +10,7 @@ function orderDetails(drink:string){
 
 export default function RoomDrinks({ownIndex,ownName,ownBean,friends}:{ownIndex:number,ownName:string,ownBean?:string,friends:Person[]}){
  const own=menu[ownIndex],shared=friends.length>0;
- return <div className={'cafe-desk '+(shared?'cafe-desk-shared':'cafe-desk-solo')}>
- <div className="desk-structure" aria-hidden="true"><span className="desk-leg desk-leg-left"/><span className="desk-leg desk-leg-right"/><span className="desk-surface"/></div>
- <div className={'room-drinks '+(shared?'room-drinks-shared':'room-drinks-solo')} role="group" aria-label={shared?'함께 마시는 음료':'내 음료'} tabIndex={friends.length>2?0:undefined}>
+ return <div className={'room-drinks '+(shared?'room-drinks-shared':'room-drinks-solo')} role="group" aria-label={shared?'함께 마시는 음료':'내 음료'} tabIndex={friends.length>2?0:undefined}>
   <figure className="room-drink room-drink-self" aria-label={ownName+'님의 음료 (나)'}>
    <img className={'cup hero-cup '+(shared?'shared-drink-cup':'')} src={root+own.img} alt={own.ko}/>
    {shared?<figcaption className="shared-drink-details"><strong title={ownName}>{ownName} <span>(나)</span></strong><span>{own.name}</span>{ownBean&&<small title={ownBean}>{ownBean}</small>}</figcaption>:ownBean&&<figcaption className="bean-caption">{ownBean}</figcaption>}
@@ -24,5 +22,5 @@ export default function RoomDrinks({ownIndex,ownName,ownBean,friends}:{ownIndex:
     <figcaption className="shared-drink-details"><strong title={friend.name}>{friend.name}</strong><span title={label}>{item?.name||label}</span>{bean&&<small title={bean}>{bean}</small>}</figcaption>
    </figure>;
   })}
- </div></div>;
+ </div>;
 }
