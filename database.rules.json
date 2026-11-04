@@ -7,7 +7,7 @@
         "members": {
           ".read": "auth != null && data.child(auth.uid).exists()",
           "$uid": {
-            ".write": "auth != null && auth.uid === $uid && $code.matches(/^[0-9]{4,8}$/)",
+            ".write": "auth != null && auth.uid === $uid && $code.matches(/^[0-9]{4,8}$/) && (!newData.exists() || data.exists() || root.child('rooms').child($code).child('members').exists() || (!newData.parent().parent().child('messages').exists() && !newData.parent().parent().child('inboxes').exists()))",
             ".validate": "newData.hasChildren(['name','drink','joinedAt'])",
             "name": {
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16"
@@ -55,7 +55,8 @@
             "$other": {
               ".validate": false
             }
-          }
+          },
+          ".write": "auth != null && $code.matches(/^[0-9]{4,8}$/) && !newData.exists() && (!root.child('rooms').child($code).child('members').exists() || !newData.parent().child('members').exists())"
         },
         "inboxes": {
           "$uid": {
@@ -91,7 +92,8 @@
                 ".validate": false
               }
             }
-          }
+          },
+          ".write": "auth != null && $code.matches(/^[0-9]{4,8}$/) && !newData.exists() && (!root.child('rooms').child($code).child('members').exists() || !newData.parent().child('members').exists())"
         },
         "$other": {
           ".validate": false

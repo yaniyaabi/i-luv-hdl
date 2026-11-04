@@ -1,9 +1,10 @@
 import {parentPort} from 'node:worker_threads';
 import {getAuth,deleteUser} from 'firebase/auth';
-import {getDatabase,goOffline,goOnline,ref,remove} from 'firebase/database';
+import {getDatabase,goOffline,goOnline,ref,remove,set,get,serverTimestamp} from 'firebase/database';
+import {firebaseConfig} from '../lib/firebase-config.ts';
 import {connectRoom} from '../lib/firebase-room.ts';
 let room;
-const ownMessages=[];
+
 parentPort.on('message',async ({seq,action,...params})=>{
  try{
   let result;
@@ -12,19 +13,33 @@ parentPort.on('message',async ({seq,action,...params})=>{
     result={id:room.id};
   }else if(action==='send'){
     await room.send(params.body,params.recipient,params.messageId);
-    if(!ownMessages.some(message=>message.id===params.messageId))ownMessages.push({code:params.code,recipient:params.recipient,id:params.messageId});
   }else if(action==='offline')goOffline(getDatabase());
   else if(action==='online')goOnline(getDatabase());
-  else if(action==='cleanup'){
-    for(const message of ownMessages){
-      const base='rooms/'+message.code;
-      if(message.recipient){
-        await remove(ref(getDatabase(),base+'/inboxes/'+room.id+'/'+message.id));
-        await remove(ref(getDatabase(),base+'/inboxes/'+message.recipient+'/'+message.id));
-      }else await remove(ref(getDatabase(),base+'/messages/'+message.id));
+  else if(action==='close')await room.close();
+  else if(action==='sendAndClose'){
+    const sending=room.send(params.body,'',params.messageId).then(()=>({sent:true}),error=>({error:error.message}));
+    await room.close();result=await sending;
+  }
+  else if(action==='probeEmpty'){
+    // Creating presence without a reset is rejected by Rules if either history
+    // collection still exists in an empty room, including other users' inboxes.
+    const member=ref(getDatabase(),'rooms/'+params.code+'/members/'+getAuth().currentUser.uid);
+    try{
+      await set(member,{name:'empty probe',drink:'americano',joinedAt:serverTimestamp()});
+      result={messages:(await get(ref(getDatabase(),'rooms/'+params.code+'/messages'))).val()};
+    }finally{await remove(member)}
+  }else if(action==='waitAbsent'){
+    const user=getAuth().currentUser,token=await user.getIdToken(),deadline=Date.now()+10000;
+    for(;;){
+      const response=await fetch(firebaseConfig.databaseURL+'/rooms/'+params.code+'/members.json?auth='+encodeURIComponent(token));
+      if(response.status===401||response.status===403)break;
+      if(!response.ok)throw Error('Unexpected presence response '+response.status);
+      if(Date.now()>deadline)throw Error('Presence did not disconnect');
+      await new Promise(resolve=>setTimeout(resolve,100));
     }
-    await room.close();
-    await deleteUser(getAuth().currentUser);
+  }else if(action==='cleanup'){
+    if(room)await room.close();
+    if(getAuth().currentUser)await deleteUser(getAuth().currentUser);
   }
   parentPort.postMessage({seq,result});
  }catch(error){parentPort.postMessage({seq,error:error.message})}

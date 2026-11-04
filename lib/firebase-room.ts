@@ -23,14 +23,49 @@ export function roomError(error:unknown){
   if(/network|unavailable/i.test(code))return '인터넷 연결을 확인해주세요.';
   return error instanceof Error?error.message:'다시 시도해주세요.';
 }
+function permissionDenied(error:unknown){
+ return /permission[_-]?denied/i.test((error as {code?:string})?.code||'');
+}
 
 export async function connectRoom(options:Options){
   const {code,name,drink,onPeople,onMessages,onStatus}=options;
   if(!/^\d{4,8}$/.test(code))throw Error('방 번호는 숫자 4~8자리로 입력해주세요.');
   const uid=await visitor();
-  const base='rooms/'+code,member=ref(db,base+'/members/'+uid);
+  const base='rooms/'+code,room=ref(db,base),member=ref(db,base+'/members/'+uid);
   const profile={name:name.trim().slice(0,16)||'guest',drink:drink.slice(0,160),joinedAt:serverTimestamp()};
   const disconnect=onDisconnect(member);
+  async function enter(){
+    // Rules check this whole update against the latest server state. Clearing
+    // history is allowed only for an empty room; otherwise join its live session.
+    for(let attempt=0;attempt<5;attempt++){
+      const nextProfile={...profile,joinedAt:serverTimestamp()};
+      try{
+        await update(room,{['members/'+uid]:nextProfile,messages:null,inboxes:null});
+        previous=null;system=[];publicMessages=[];whispers=[];
+        return;
+      }
+      catch(error){if(!permissionDenied(error))throw error}
+      try{await set(member,nextProfile);return}
+      catch(error){if(!permissionDenied(error))throw error}
+      // The last member may have left between the two requests. Retry the
+      // empty-room reset instead of exposing that session's saved messages.
+    }
+    throw Error('방 상태가 바뀌었어요. 다시 입장해주세요.');
+  }
+  async function depart(){
+    try{
+      // Remove our presence and both histories together, only if nobody remains.
+      await update(room,{['members/'+uid]:null,messages:null,inboxes:null});
+    }catch(error){
+      if(!permissionDenied(error))throw error;
+      await remove(member);
+      // Handles two people leaving at once. Rules reject this if anyone stayed
+      // or a new visitor has already begun another session.
+      try{await update(room,{messages:null,inboxes:null})}
+      catch(error){if(!permissionDenied(error))throw error}
+    }
+    await disconnect.cancel();
+  }
   const unsubscribers:Unsubscribe[]=[];
   const listeners:Unsubscribe[]=[];
   const stopListening=()=>listeners.splice(0).forEach(unsubscribe=>unsubscribe());
@@ -44,8 +79,18 @@ export async function connectRoom(options:Options){
     snapshot.forEach(child=>{result.push({...child.val() as StoredMessage,id:child.key!})});
     return result;
   };
-  const listen=()=>{
+  const listen=async()=>{
     stopListening();
+    // Firebase may retain snapshots from a disconnected session. Refresh the
+    // server snapshots before attaching listeners so a new room never flashes
+    // its previous session's public messages or cached private inbox.
+    previous=null;system=[];publicMessages=[];whispers=[];emit();
+    await Promise.all([
+      get(ref(db,base+'/members')),
+      get(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100))),
+      get(query(ref(db,base+'/inboxes/'+uid),orderByChild('created'),limitToLast(100))),
+    ]);
+    if(closed||!connected)return false;
     listeners.push(onValue(ref(db,base+'/members'),snapshot=>{
       const current=(snapshot.val()||{}) as Record<string,Profile>;
       for(const [id,p] of Object.entries(current)){
@@ -61,12 +106,13 @@ export async function connectRoom(options:Options){
     },failed));
     listeners.push(onValue(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100)),snapshot=>{publicMessages=fromSnapshot(snapshot);emit()},failed));
     listeners.push(onValue(query(ref(db,base+'/inboxes/'+uid),orderByChild('created'),limitToLast(100)),snapshot=>{whispers=fromSnapshot(snapshot);emit()},failed));
+    return true;
   };
   try{
     // Register the server-side cleanup before announcing this visitor as online.
     await disconnect.remove();
-    await set(member,profile);
-    listen();
+    await enter();
+    await listen();
     unsubscribers.push(onValue(ref(db,'.info/connected'),snapshot=>{
       if(closed)return;
       if(snapshot.val()!==true){connected=false;firstConnection=false;stopListening();onStatus('연결이 끊겼어요. 다시 연결하는 중…');return}
@@ -77,19 +123,18 @@ export async function connectRoom(options:Options){
         try{
           await disconnect.remove();
           if(closed){await disconnect.cancel();return}
-          await set(member,{...profile,joinedAt:serverTimestamp()});
-          if(closed){await remove(member);await disconnect.cancel();return}
+          await enter();
+          if(closed){await depart();return}
           // Reattach only after membership exists; restored subscriptions may
           // otherwise be rejected before the presence write reaches Firebase.
-          connected=true;listen();
-          onStatus('');
+          connected=true;if(await listen())onStatus('');
         }catch(error){failed(error)}finally{reconnecting=false}
       })();
     }));
   }catch(error){
     closed=true;stopListening();unsubscribers.forEach(unsubscribe=>unsubscribe());
     // Keep onDisconnect registered if removal cannot reach the server.
-    await remove(member).then(()=>disconnect.cancel()).catch(()=>{});
+    await depart().catch(()=>{});
     throw Error(roomError(error));
   }
   return {
@@ -104,7 +149,9 @@ export async function connectRoom(options:Options){
       const target=recipient?previous?.[recipient]:null;
       if(recipient&&!target)throw Error('상대방이 방을 나갔어요.');
       const ownPath=recipient?base+'/inboxes/'+uid+'/'+messageId:base+'/messages/'+messageId;
-      if((await get(ref(db,ownPath))).exists())return;
+      const existing=await get(ref(db,ownPath));
+      if(closed)throw Error('방에 다시 입장해주세요.');
+      if(existing.exists())return;
       if(Date.now()-lastSent<600)throw Error('잠시 후 메시지를 보내주세요.');
       const message={kind:'chat',sender:uid,senderName:profile.name,recipient,recipientName:target?.name||'',body,created:serverTimestamp()};
       if(recipient)await update(ref(db),{[ownPath]:message,[base+'/inboxes/'+recipient+'/'+messageId]:message});
@@ -114,7 +161,7 @@ export async function connectRoom(options:Options){
     async close(){
       if(closed)return;
       closed=true;stopListening();unsubscribers.forEach(unsubscribe=>unsubscribe());
-      await remove(member).then(()=>disconnect.cancel());
+      await depart();
     },
   };
 }

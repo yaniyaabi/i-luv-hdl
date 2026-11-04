@@ -55,10 +55,18 @@ try{
   denied(await request(c,'rooms/'+room+'/inboxes'));
   denied(await request(c,'rooms/'+room+'/inboxes/'+c.uid+'/'+randomUUID(),'PUT',message(a,b.uid,b.name)));
   denied(await request(a,'rooms/'+room+'/inboxes/'+c.uid+'/'+randomUUID(),'PUT',privateMessage));
+  // Cleanup cannot erase a room that still has another member, even in a
+  // multi-path request that tries to remove someone else's presence as well.
+  denied(await request(a,'rooms/'+room,'PATCH',{messages:null,inboxes:null}));
+  denied(await request(a,'rooms/'+room,'PATCH',{['members/'+a.uid]:null,messages:null,inboxes:null}));
+  denied(await request(d,'rooms/'+room,'PATCH',{['members/'+a.uid]:null,['members/'+b.uid]:null,['members/'+c.uid]:null,messages:null,inboxes:null}));
+  assert.equal(Object.keys((await request(a,'rooms/'+room+'/members')).body).length,3,'failed cleanup is atomic');
+  assert.equal((await request(b,publicPath)).body.sender,a.uid,'failed cleanup preserves public chat');
+  assert.equal((await request(b,theirs)).body.sender,a.uid,'failed cleanup preserves private inboxes');
   await request(c,'rooms/'+room+'/members/'+c.uid,'DELETE');
   denied(await request(c,publicPath));
   denied(await request(c,'rooms/'+room+'/messages/'+randomUUID(),'PUT',message(c)));
-  console.log('PASS: anonymous entry, shared presence, public chat, room isolation, private-message privacy, spoof/tamper/length rejection, membership revocation.');
+  console.log('PASS: anonymous entry, shared presence, public chat, room isolation, private-message privacy, spoof/tamper/length rejection, membership revocation, and occupied-room cleanup rejection.');
 }finally{
   // Messages must be removed while their sender is still a member.
   for(const {user,path} of written.filter(x=>!x.path.includes('/members/'))){

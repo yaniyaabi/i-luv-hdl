@@ -39,7 +39,42 @@ try{
  const reply=randomUUID();
  await b.call('send',{code,messageId:reply,body:'back online',recipient:''});
  await until(()=>a.state.messages.some(m=>m.id===reply),'chat works after reconnect');
- console.log('PASS: actual room client entry/order events, real-time public chat, private chat, retry idempotence, disconnect cleanup, reconnection and subsequent delivery.');
+
+ // Leaving one visitor behind must preserve both public and private history.
+ const cancelledId=randomUUID();
+ const cancelled=await a.call('sendAndClose',{messageId:cancelledId,body:'must not arrive after leaving'});
+ assert.ok(cancelled.error,'in-flight send stops on exit');
+ await until(()=>b.state.people.length===1,'remaining member stays connected');
+ assert.equal(b.state.messages.some(m=>m.id===cancelledId),false,'departed client cannot post into a later session');
+ assert.ok(b.state.messages.some(m=>m.id===id),'public history stays while occupied');
+ assert.ok(b.state.messages.some(m=>m.id===dm),'whispers stay while occupied');
+ await a.call('join',{code,name:'SDK Alice',drink:'americano'});
+ await until(()=>a.state.people.length===2&&a.state.messages.some(m=>m.id===id),'rejoin occupied room preserves messages');
+
+ // Both concurrent departures must clear every inbox, not only the last user's.
+ await Promise.all([a.call('close'),b.call('close')]);
+ const empty=await b.call('probeEmpty',{code});
+ assert.equal(empty.messages,null,'last exit physically clears both histories');
+ await a.call('join',{code,name:'SDK Alice',drink:'americano'});
+ await b.call('join',{code,name:'SDK Bob',drink:'matcha latte'});
+ await until(()=>a.state.people.length===2&&b.state.people.length===2,'fresh room has both members');
+ assert.equal(a.state.messages.some(m=>m.kind==='chat'),false,'fresh session has no old public chat or whispers');
+ assert.equal(b.state.messages.some(m=>m.kind==='chat'),false,'both visitors start clean');
+
+ // Closing every connection may leave history on the server. The first restored
+ // presence resets it before subscribing, so previous-session text never returns.
+ const disconnectedId=randomUUID();
+ await a.call('send',{code,messageId:disconnectedId,body:'before all connections close',recipient:''});
+ await until(()=>b.state.messages.some(m=>m.id===disconnectedId),'message before disconnect');
+ await Promise.all([a.call('offline'),b.call('offline')]);
+ await Promise.all([a.call('waitAbsent',{code}),b.call('waitAbsent',{code})]);
+ await a.call('online');
+ await until(()=>a.state.status===''&&a.state.people.length===1,'first reconnection restores an empty room');
+ assert.equal(a.state.messages.some(m=>m.kind==='chat'),false,'empty-room reconnect clears local cached history');
+ await b.call('online');
+ await until(()=>b.state.status===''&&b.state.people.length===2,'second reconnect joins fresh session');
+ assert.equal(b.state.messages.some(m=>m.kind==='chat'),false,'no stale whispers or public messages after reconnect');
+ console.log('PASS: real-time chat and privacy, occupied-room preservation, simultaneous last exits, physical cleanup of all histories, clean reentry, and disconnect/reconnect reset.');
 }finally{
  const cleanup=[];
  await a.call('cleanup').catch(error=>cleanup.push(error));

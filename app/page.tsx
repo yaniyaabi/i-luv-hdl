@@ -17,6 +17,7 @@ export default function Home(){
  const doorBell=useRef<HTMLAudioElement|null>(null);
  const id=useRef('');
  const room=useRef<CafeRoom|null>(null);
+ const leaving=useRef<Promise<void>|null>(null);
  const isCoffee=drinks[drinkIndex].coffee,isTea=false,drink=drinks[drinkIndex].name+(isCoffee?' · '+bean:'');
  useEffect(()=>()=>{void room.current?.close().catch(()=>{})},[]);
  useEffect(()=>{
@@ -25,6 +26,7 @@ export default function Home(){
  },[]);
 
  async function join(){
+  if(leaving.current)await leaving.current;
   if(room.current)await room.current.close();
   const client=await connectRoom({code,name:name.trim()||'guest',drink,onPeople:setPeople,onMessages:setMessages,onStatus:setError});
   id.current=client.id;room.current=client;setJoined(true);setError('');
@@ -34,7 +36,10 @@ export default function Home(){
  async function leave(){
   const client=room.current;room.current=null;
   setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRunning(false);setStep('drink');setError('');
-  if(client)void client.close().catch(e=>setError(roomError(e)));
+  if(client){
+   const pending=client.close().catch(e=>setError(roomError(e))).finally(()=>{if(leaving.current===pending)leaving.current=null});
+   leaving.current=pending;
+  }
  }
  function enterCafe(){
   const bell=doorBell.current;
