@@ -13,7 +13,7 @@ function visitor(){
 }
 type Profile={name:string,drink:string,joinedAt:number};
 type StoredMessage=Omit<RoomMessage,'id'>;
-type Options={code:string,name:string,drink:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void};
+type Options={code:string,name:string,drink:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void};
 
 export function roomError(error:unknown){
   const code=(error as {code?:string})?.code || '';
@@ -42,6 +42,7 @@ export async function connectRoom(options:Options){
       try{
         await update(room,{['members/'+uid]:nextProfile,messages:null,inboxes:null});
         previous=null;system=[];publicMessages=[];whispers=[];
+        hasBaseline=false;seenMessages.clear();options.onReset?.();
         return;
       }
       catch(error){if(!permissionDenied(error))throw error}
@@ -70,6 +71,8 @@ export async function connectRoom(options:Options){
   const listeners:Unsubscribe[]=[];
   const stopListening=()=>listeners.splice(0).forEach(unsubscribe=>unsubscribe());
   let closed=false,previous:Record<string,Profile>|null=null,system:RoomMessage[]=[],publicMessages:RoomMessage[]=[],whispers:RoomMessage[]=[];
+  let hasBaseline=false;
+  const seenMessages=new Set<string>();
   let firstConnection=true,reconnecting=false,connected=true,lastSent=0;
   const emit=()=>{if(!closed)onMessages([...publicMessages,...whispers,...system].sort((a,b)=>a.created-b.created).slice(-100))};
   const announce=(body:string)=>{system.push({id:'system-'+crypto.randomUUID(),kind:'system',sender:'',senderName:'',recipient:'',recipientName:'',body,created:Date.now()});system=system.slice(-100)};
@@ -79,18 +82,33 @@ export async function connectRoom(options:Options){
     snapshot.forEach(child=>{result.push({...child.val() as StoredMessage,id:child.key!})});
     return result;
   };
+  const trackIncoming=(next:RoomMessage[],channel:string)=>{
+    let count=0;
+    for(const message of next){
+      const key=channel+':'+message.id;
+      if(seenMessages.has(key))continue;
+      seenMessages.add(key);
+      if(hasBaseline&&message.kind==='chat'&&message.sender!==uid)count++;
+    }
+    if(count&&!closed)options.onIncoming?.(count);
+  };
   const listen=async()=>{
     stopListening();
     // Firebase may retain snapshots from a disconnected session. Refresh the
     // server snapshots before attaching listeners so a new room never flashes
     // its previous session's public messages or cached private inbox.
     previous=null;system=[];publicMessages=[];whispers=[];emit();
-    await Promise.all([
+    const [,freshPublic,freshWhispers]=await Promise.all([
       get(ref(db,base+'/members')),
       get(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100))),
       get(query(ref(db,base+'/inboxes/'+uid),orderByChild('created'),limitToLast(100))),
     ]);
     if(closed||!connected)return false;
+    // Seed existing history before subscribing. Only genuinely new messages
+    // notify; repeated snapshots, our own echoes, and system events do not.
+    trackIncoming(fromSnapshot(freshPublic),'public');
+    trackIncoming(fromSnapshot(freshWhispers),'private');
+    hasBaseline=true;
     listeners.push(onValue(ref(db,base+'/members'),snapshot=>{
       const current=(snapshot.val()||{}) as Record<string,Profile>;
       for(const [id,p] of Object.entries(current)){
@@ -104,8 +122,8 @@ export async function connectRoom(options:Options){
       if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink})));
       emit();
     },failed));
-    listeners.push(onValue(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100)),snapshot=>{publicMessages=fromSnapshot(snapshot);emit()},failed));
-    listeners.push(onValue(query(ref(db,base+'/inboxes/'+uid),orderByChild('created'),limitToLast(100)),snapshot=>{whispers=fromSnapshot(snapshot);emit()},failed));
+    listeners.push(onValue(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100)),snapshot=>{publicMessages=fromSnapshot(snapshot);trackIncoming(publicMessages,'public');emit()},failed));
+    listeners.push(onValue(query(ref(db,base+'/inboxes/'+uid),orderByChild('created'),limitToLast(100)),snapshot=>{whispers=fromSnapshot(snapshot);trackIncoming(whispers,'private');emit()},failed));
     return true;
   };
   try{

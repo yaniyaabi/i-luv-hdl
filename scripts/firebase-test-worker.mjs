@@ -9,7 +9,8 @@ parentPort.on('message',async ({seq,action,...params})=>{
  try{
   let result;
   if(action==='join'){
-    room=await connectRoom({...params,onPeople:people=>parentPort.postMessage({event:'people',people}),onMessages:messages=>parentPort.postMessage({event:'messages',messages}),onStatus:status=>parentPort.postMessage({event:'status',status})});
+    parentPort.postMessage({event:'notification-reset'});
+    room=await connectRoom({...params,onPeople:people=>parentPort.postMessage({event:'people',people}),onMessages:messages=>parentPort.postMessage({event:'messages',messages}),onStatus:status=>parentPort.postMessage({event:'status',status}),onIncoming:count=>parentPort.postMessage({event:'incoming',count}),onReset:()=>parentPort.postMessage({event:'notification-reset'})});
     result={id:room.id};
   }else if(action==='send'){
     await room.send(params.body,params.recipient,params.messageId);

@@ -4,12 +4,14 @@ import assert from 'node:assert/strict';
 const code=String(10000000+Math.floor(Math.random()*80000000));
 function client(){
  const worker=new Worker(new URL('./firebase-test-worker.mjs',import.meta.url));
- let seq=0;const pending=new Map();const state={people:[],messages:[],status:''};
+ let seq=0;const pending=new Map();const state={people:[],messages:[],status:'',received:0};
  worker.on('message',message=>{
   if(message.seq){const cb=pending.get(message.seq);pending.delete(message.seq);message.error?cb.reject(Error(message.error)):cb.resolve(message.result)}
   else if(message.event==='people')state.people=message.people;
   else if(message.event==='messages')state.messages=message.messages;
   else if(message.event==='status')state.status=message.status;
+  else if(message.event==='incoming')state.received+=message.count;
+  else if(message.event==='notification-reset')state.received=0;
  });
  return {state,worker,call(action,params={}){return new Promise((resolve,reject)=>{pending.set(++seq,{resolve,reject});worker.postMessage({seq,action,...params})})}};
 }
@@ -26,12 +28,17 @@ try{
  const id=randomUUID();
  await a.call('send',{code,messageId:id,body:'public SDK test',recipient:''});
  await until(()=>b.state.messages.some(m=>m.id===id),'public message delivered');
+ assert.equal(b.state.received,1,'incoming public message notifies once');
+ assert.equal(a.state.received,0,'own message never notifies');
  await a.call('send',{code,messageId:id,body:'public SDK test',recipient:''});
  assert.equal(b.state.messages.filter(m=>m.id===id).length,1,'retry idempotence');
+ assert.equal(b.state.received,1,'repeated snapshots do not notify twice');
  await new Promise(resolve=>setTimeout(resolve,650));
  const dm=randomUUID();
  await a.call('send',{code,messageId:dm,body:'private SDK test',recipient:bob.id});
  await until(()=>b.state.messages.some(m=>m.id===dm&&m.recipient===bob.id),'whisper delivered');
+ assert.equal(b.state.received,2,'incoming whisper notifies');
+ assert.equal(a.state.received,0,'own whisper echo never notifies');
  await b.call('offline');
  await until(()=>a.state.people.length===1,'onDisconnect removes absent member');
  await b.call('online');
@@ -50,6 +57,7 @@ try{
  assert.ok(b.state.messages.some(m=>m.id===dm),'whispers stay while occupied');
  await a.call('join',{code,name:'SDK Alice',drink:'americano'});
  await until(()=>a.state.people.length===2&&a.state.messages.some(m=>m.id===id),'rejoin occupied room preserves messages');
+ assert.equal(a.state.received,0,'loading existing public and private history does not notify');
 
  // Both concurrent departures must clear every inbox, not only the last user's.
  await Promise.all([a.call('close'),b.call('close')]);
@@ -74,7 +82,7 @@ try{
  await b.call('online');
  await until(()=>b.state.status===''&&b.state.people.length===2,'second reconnect joins fresh session');
  assert.equal(b.state.messages.some(m=>m.kind==='chat'),false,'no stale whispers or public messages after reconnect');
- console.log('PASS: real-time chat and privacy, occupied-room preservation, simultaneous last exits, physical cleanup of all histories, clean reentry, and disconnect/reconnect reset.');
+ console.log('PASS: chat lifecycle and privacy; incoming public/whisper notifications; no self, duplicate, or history notifications.');
 }finally{
  const cleanup=[];
  await a.call('cleanup').catch(error=>cleanup.push(error));

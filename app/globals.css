@@ -45,3 +45,11 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 .music-dock.is-dragging iframe{pointer-events:none}
 .music-dock.is-dragging{box-shadow:0 5px 20px #62503122}
 @media(pointer:coarse){.music-dock .music-drag-handle{min-height:30px}}
+/* Silent visual alerts for newly received chat and whispers. */
+.game-chat.has-unread{border-color:#e2a5a0;background:#fff8f1ed;box-shadow:0 2px 13px #c54c3d14}
+.has-unread .game-chat-tools{opacity:1}
+.has-unread .game-chat-toggle{color:#bd413b}
+.game-chat .chat-cupcake-icon{display:block;width:22px;height:22px;object-fit:contain}
+.game-chat .chat-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 5px;border-radius:12px;background:#cd4544;color:#fff;font-size:10px;font-weight:600;line-height:1;text-shadow:none;animation:chat-notification .8s ease-out 2}
+.game-chat.chat-minimized.has-unread{width:190px}
+@keyframes chat-notification{from{box-shadow:0 0 0 0 #cd454455}to{box-shadow:0 0 0 6px #cd454400}}
