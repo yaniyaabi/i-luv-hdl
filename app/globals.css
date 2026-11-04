@@ -107,3 +107,5 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 @media(max-width:650px){.stack-room{padding:12px 12px 110px}.stack-toolbar{padding:5px;gap:0}.stack-help{font-size:14px;margin-top:7px}.stack-help-sub{font-size:12px;margin-top:2px}.stack-board-frame{margin-top:4px}.stack-footer{font-size:12px}.stack-empty{bottom:130px;font-size:13px}.stack-selection-tools{bottom:110px}}
 
 .music-volume{display:flex;align-items:center;gap:6px;padding:6px 8px;border-top:1px solid #ece5d8;color:#a48d70;background:#fffdf5;min-height:32px}.music-volume[hidden]{display:none}.music-volume button{display:grid;place-items:center;flex-shrink:0;width:22px;height:22px;padding:0;border:0;background:transparent;color:inherit}.music-volume button:disabled,.music-volume input:disabled{opacity:.4}.music-volume input{min-width:0;width:100%;height:18px;accent-color:#ad9374;padding:0;margin:0}.music-volume output{font-size:10px;min-width:30px;text-align:right;font-variant-numeric:tabular-nums}.music-volume button:focus-visible,.music-volume input:focus-visible{outline:2px solid #b09a7b;outline-offset:2px}
+
+.music-dock{z-index:30}
