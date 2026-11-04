@@ -1,5 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {ChevronLeft,ChevronRight,MessageCircle,Pause,Play,Send,Trash2,X} from 'lucide-react';
+import {ChevronLeft,ChevronRight,MessageCircle,Send,Trash2,X} from 'lucide-react';
 import {memes,type Meme} from '../lib/memes';
 import {deleteMemeComment,listenMemeComments,sendMemeComment,type MemeComment} from '../lib/firebase-memes';
 
@@ -12,19 +12,21 @@ function commentError(error:unknown){
 }
 
 export default function MemeGotgan({name}:{name:string}){
- const [filter,setFilter]=useState('전체'),[selected,setSelected]=useState<Meme|null>(null),[paused,setPaused]=useState(false);
- const trigger=useRef<HTMLElement|null>(null);
- const filtered=memes.filter(meme=>filter==='전체'||meme.category===filter);
- function open(meme:Meme,event:React.MouseEvent<HTMLButtonElement>){trigger.current=event.currentTarget;setSelected(meme)}
- function close(){setSelected(null);trigger.current?.focus()}
- return <section className="meme-room" id="meme-panel" role="tabpanel" aria-labelledby="meme-tab">
-  <div className="meme-page-heading"><span className="meme-eyebrow">a little break for your brain</span><h1>meme gotgan<span aria-hidden="true"> ✳</span></h1><p>공부하다가, 현생 살다가. 잠깐 웃고 가요.</p></div>
-  <div className="meme-stream-heading"><span>지금 곶간에 흐르는 밈</span><button onClick={()=>setPaused(!paused)} aria-label={paused?'밈 자동 넘김 시작':'밈 자동 넘김 정지'}>{paused?<Play size={13}/>:<Pause size={13}/>}<span>{paused?'play':'pause'}</span></button></div>
-  <div className={'meme-stream '+(paused||selected?'is-paused':'')} aria-label="흘러가는 밈 모음"><div className="meme-stream-track">{[0,1].map(copy=><div className="meme-stream-group" key={copy} aria-hidden={copy===1?true:undefined}>{memes.map(meme=><button key={meme.id} tabIndex={copy===1?-1:0} onClick={event=>open(meme,event)} aria-label={meme.title+' 크게 보기'}><img src={root+meme.image} alt={copy===1?'':meme.alt}/><span>{meme.title}</span></button>)}</div>)}</div></div>
-  <div className="meme-album-heading"><div><h2>오늘의 밈 앨범</h2><span>{filtered.length} memes · 하나를 눌러 댓글도 남겨보세요.</span></div><div className="meme-filters" role="group" aria-label="밈 분류">{['전체','공부','현생'].map(category=><button key={category} aria-pressed={filter===category} onClick={()=>setFilter(category)}>{category}</button>)}</div></div>
-  <div className="meme-album">{filtered.map(meme=><button className="meme-card" key={meme.id} onClick={event=>open(meme,event)} aria-label={meme.title+' 댓글 보기'}><div className="meme-card-image"><img src={root+meme.image} alt={meme.alt} loading="lazy"/></div><div className="meme-card-caption"><span className="meme-card-number">0{memes.indexOf(meme)+1}</span><div><span className="meme-tag">{meme.category}</span><h3>{meme.title}</h3></div><MessageCircle size={17}/></div></button>)}</div>
-  <p className="meme-bottom-note">웃었으면 됐지. 다시 나의 속도로.</p>
-  {selected&&<MemeDetail key={selected.id} meme={selected} name={name} onClose={close} onChange={setSelected}/>}
+ const [index,setIndex]=useState(0),[expanded,setExpanded]=useState(false);
+ const trigger=useRef<HTMLElement|null>(null),meme=memes[index];
+ function open(event:React.MouseEvent<HTMLButtonElement>){trigger.current=event.currentTarget;setExpanded(true)}
+ function close(){setExpanded(false);trigger.current?.focus()}
+ function move(direction:number){setIndex(current=>(current+direction+memes.length)%memes.length)}
+ return <section className="meme-room meme-room-album" id="meme-panel" role="tabpanel" aria-labelledby="meme-tab" onKeyDown={event=>{if(expanded)return;if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1)}}}>
+  <div className="meme-single-album" aria-roledescription="carousel" aria-label="밈 앨범">
+   <div className="meme-album-stage"><button className="meme-album-arrow" aria-label="이전 밈" onClick={()=>move(-1)}><ChevronLeft size={25}/></button>
+    <button className="meme-featured" onClick={open} aria-label={meme.title+' 크게 보고 댓글 남기기'}><img src={root+meme.image} alt={meme.alt}/></button>
+    <button className="meme-album-arrow" aria-label="다음 밈" onClick={()=>move(1)}><ChevronRight size={25}/></button>
+   </div>
+   <div className="meme-album-caption" aria-live="polite" aria-atomic="true"><h1>{meme.title}</h1><span>{index+1} / {memes.length}</span></div>
+   <button className="meme-open-comments" onClick={open}><MessageCircle size={17}/>댓글 보기 · 남기기</button>
+  </div>
+  {expanded&&<MemeDetail key={meme.id} meme={meme} name={name} onClose={close} onChange={next=>setIndex(memes.findIndex(item=>item.id===next.id))}/>}
  </section>;
 }
 
