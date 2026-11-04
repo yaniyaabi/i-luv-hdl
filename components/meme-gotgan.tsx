@@ -13,15 +13,17 @@ function commentError(error:unknown){
 
 export default function MemeGotgan({name}:{name:string}){
  const [index,setIndex]=useState(0),[expanded,setExpanded]=useState(false);
- const trigger=useRef<HTMLElement|null>(null),meme=memes[index];
+ const trigger=useRef<HTMLElement|null>(null),meme=memes[index],previous=memes[(index+memes.length-1)%memes.length],next=memes[(index+1)%memes.length];
  function open(event:React.MouseEvent<HTMLButtonElement>){trigger.current=event.currentTarget;setExpanded(true)}
  function close(){setExpanded(false);trigger.current?.focus()}
  function move(direction:number){setIndex(current=>(current+direction+memes.length)%memes.length)}
  return <section className="meme-room meme-room-album" id="meme-panel" role="tabpanel" aria-labelledby="meme-tab" onKeyDown={event=>{if(expanded)return;if(event.key==='ArrowLeft'||event.key==='ArrowRight'){event.preventDefault();move(event.key==='ArrowLeft'?-1:1)}}}>
   <div className="meme-single-album" aria-roledescription="carousel" aria-label="밈 앨범">
-   <div className="meme-album-stage"><button className="meme-album-arrow" aria-label="이전 밈" onClick={()=>move(-1)}><ChevronLeft size={25}/></button>
+   <div className="meme-album-stage"><button className="meme-neighbor meme-neighbor-prev" aria-label={'이전 밈 미리보기: '+previous.title} onClick={()=>move(-1)}><img src={root+previous.image} alt={previous.alt}/></button>
+    <button className="meme-album-arrow meme-album-arrow-prev" aria-label="이전 밈" onClick={()=>move(-1)}><ChevronLeft size={25}/></button>
     <button className="meme-featured" onClick={open} aria-label={meme.title+' 크게 보고 댓글 남기기'}><img src={root+meme.image} alt={meme.alt}/></button>
-    <button className="meme-album-arrow" aria-label="다음 밈" onClick={()=>move(1)}><ChevronRight size={25}/></button>
+    <button className="meme-album-arrow meme-album-arrow-next" aria-label="다음 밈" onClick={()=>move(1)}><ChevronRight size={25}/></button>
+    <button className="meme-neighbor meme-neighbor-next" aria-label={'다음 밈 미리보기: '+next.title} onClick={()=>move(1)}><img src={root+next.image} alt={next.alt}/></button>
    </div>
    <div className="meme-album-caption" aria-live="polite" aria-atomic="true"><h1>{meme.title}</h1><span>{index+1} / {memes.length}</span></div>
    <button className="meme-open-comments" onClick={open}><MessageCircle size={17}/>댓글 보기 · 남기기</button>
@@ -59,7 +61,7 @@ function MemeDetail({meme,name,onClose,onChange}:{meme:Meme,name:string,onClose:
  return <div className="meme-dialog-backdrop" onClick={event=>{if(event.target===event.currentTarget)onClose()}}><div className="meme-dialog" ref={dialog} role="dialog" aria-modal="true" aria-labelledby={'meme-title-'+meme.id} onKeyDown={keys}>
   <button className="meme-close" ref={closeButton} aria-label="밈 닫기" onClick={onClose}><X size={21}/></button>
   <div className="meme-full-image"><img src={root+meme.image} alt={meme.alt}/><div className="meme-image-nav"><button aria-label="이전 밈" onClick={()=>onChange(memes[(index+memes.length-1)%memes.length])}><ChevronLeft size={19}/></button><span>{index+1} / {memes.length}</span><button aria-label="다음 밈" onClick={()=>onChange(memes[(index+1)%memes.length])}><ChevronRight size={19}/></button></div></div>
-  <div className="meme-discussion"><span className="meme-tag">{meme.category}</span><h2 id={'meme-title-'+meme.id}>{meme.title}</h2><p className="meme-comment-intro">이 밈, 나만 공감한 거 아니지?</p><h3><MessageCircle size={16}/>댓글 <span>{comments.length}{comments.length===100?'+':''}</span></h3>
+  <div className="meme-discussion"><h2 id={'meme-title-'+meme.id}>{meme.title}</h2><p className="meme-comment-intro">이 밈, 나만 공감한 거 아니지?</p><h3><MessageCircle size={16}/>댓글 <span>{comments.length}{comments.length===100?'+':''}</span></h3>
    <div className="meme-comments" aria-live="polite" aria-busy={loading}>{loading?<p className="meme-empty">댓글을 불러오는 중…</p>:comments.length?comments.map(comment=><article className="meme-comment" key={comment.id}><div><strong>{comment.authorName}{comment.authorId===uid&&<small> 나</small>}</strong><time dateTime={new Date(comment.created).toISOString()}>{dateLabel(comment.created)}</time>{comment.authorId===uid&&<button aria-label="내 댓글 삭제" disabled={deleting===comment.id} onClick={async()=>{setDeleting(comment.id);try{await deleteMemeComment(meme.id,comment.id)}catch(e){setError(commentError(e))}finally{setDeleting('')}}}><Trash2 size={13}/></button>}</div><p>{comment.body}</p></article>):<p className="meme-empty">아직 댓글이 없어요.<br/>첫 공감 한 줄을 남겨주세요.</p>}</div>
    <form className="meme-comment-form" onSubmit={submit}><label htmlFor="meme-author">닉네임<input id="meme-author" value={authorName} maxLength={16} required onChange={event=>setAuthorName(event.target.value)} autoComplete="nickname"/></label><label htmlFor="meme-comment-body">댓글<textarea id="meme-comment-body" value={body} maxLength={500} required placeholder="나도 이래… 공감 한 줄 남기기" onChange={event=>{pendingId.current='';setBody(event.target.value)}} disabled={busy}/></label><div><small>{body.length}/500 · 모든 방문자가 함께 봐요.</small><button className="black" type="submit" disabled={busy||loading||!uid||!body.trim()||!authorName.trim()}><Send size={13}/>{busy?'남기는 중…':'댓글 남기기'}</button></div>{error&&<p role="alert" className="meme-error">{error}</p>}</form>
   </div>
