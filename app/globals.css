@@ -36,3 +36,12 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 .step-bean .bean-selection{flex:none;margin:0 auto 26px}
 @media(max-width:700px){.ordering.step-drink,.ordering.step-bean{padding:62px 20px 55px}.step-drink .paper,.step-bean .paper{width:100%;min-height:0;height:auto;padding:0}.step-drink .paper h1{margin:0 0 24px}.step-drink .drink-grid{gap:26px 14px;margin:0 auto 26px}.step-bean .paper h1{margin:0 0 10px}.step-bean .paper>.subtitle{margin:0 0 22px}.step-bean .bean-selection{margin:0 auto 25px}.step-drink .paper>.next,.step-bean .paper>.next{margin-top:0}.step-drink .paper>.back,.step-bean .paper>.back{margin-top:13px}}
 .simple-entry{position:relative;isolation:isolate;overflow:hidden}.entry-picture{position:relative;z-index:1}.entry-snow{position:absolute;inset:0;z-index:2;pointer-events:none;overflow:hidden}.entry-snow span{position:absolute;top:-30px;width:var(--snow-size);height:var(--snow-size);opacity:var(--snow-opacity);animation-name:entry-snow-fall;animation-timing-function:linear;animation-iteration-count:infinite;will-change:transform;pointer-events:none}.entry-snow .snow-dot{border-radius:50%;background:#edf1f5;box-shadow:0 0 2px #a9b8ca77,inset 0 0 1px #fff;border:1px solid #d3dce42e}.entry-snow .snow-crystal{font-size:var(--snow-size);line-height:1;color:#cad5e0;text-shadow:0 0 3px #fff9}@keyframes entry-snow-fall{0%{transform:translate3d(0,-20px,0) rotate(0deg)}50%{transform:translate3d(calc(var(--snow-drift)*-.4),50svh,0) rotate(110deg)}100%{transform:translate3d(var(--snow-drift),calc(100svh + 50px),0) rotate(250deg)}}@media(max-width:700px){.entry-snow span:nth-child(3n){display:none}}@media(prefers-reduced-motion:reduce){.entry-snow{display:none}}
+/* The title is a drag handle; the official video and its controls stay intact. */
+.music-dock header h2{min-width:0;overflow:hidden}
+.music-dock .music-drag-handle{display:flex;align-items:center;gap:5px;width:100%;min-height:24px;padding:2px 0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:grab!important;touch-action:none;user-select:none}
+.music-drag-handle span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.music-drag-handle svg{flex-shrink:0;opacity:.6}
+.music-dock.is-dragging .music-drag-handle{cursor:grabbing!important}
+.music-dock.is-dragging iframe{pointer-events:none}
+.music-dock.is-dragging{box-shadow:0 5px 20px #62503122}
+@media(pointer:coarse){.music-dock .music-drag-handle{min-height:30px}}
