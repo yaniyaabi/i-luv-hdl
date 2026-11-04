@@ -12,6 +12,8 @@ parentPort.on('message',async ({seq,action,...params})=>{
     parentPort.postMessage({event:'notification-reset'});
     room=await connectRoom({...params,onPeople:people=>parentPort.postMessage({event:'people',people}),onMessages:messages=>parentPort.postMessage({event:'messages',messages}),onStatus:status=>parentPort.postMessage({event:'status',status}),onIncoming:count=>parentPort.postMessage({event:'incoming',count}),onReset:()=>parentPort.postMessage({event:'notification-reset'})});
     result={id:room.id};
+  }else if(action==='order'){
+    await room.order(params.drink);
   }else if(action==='send'){
     await room.send(params.body,params.recipient,params.messageId);
   }else if(action==='offline')goOffline(getDatabase());

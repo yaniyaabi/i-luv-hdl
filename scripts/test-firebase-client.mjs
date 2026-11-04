@@ -39,6 +39,11 @@ try{
  await until(()=>b.state.messages.some(m=>m.id===dm&&m.recipient===bob.id),'whisper delivered');
  assert.equal(b.state.received,2,'incoming whisper notifies');
  assert.equal(a.state.received,0,'own whisper echo never notifies');
+ await a.call('order',{drink:'pudding'});
+ await until(()=>a.state.people.find(p=>p.id===alice.id)?.drink==='pudding'&&b.state.people.find(p=>p.id===alice.id)?.drink==='pudding','new order updates the same membership for everyone');
+ assert.equal(a.state.people.length,2,'ordering does not leave the room');
+ assert.ok(b.state.messages.some(m=>m.id===id)&&b.state.messages.some(m=>m.id===dm),'ordering preserves public and private chat');
+ assert.equal(b.state.received,2,'order announcements do not count as incoming chat');
  await b.call('offline');
  await until(()=>a.state.people.length===1,'onDisconnect removes absent member');
  await b.call('online');

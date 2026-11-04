@@ -157,6 +157,17 @@ export async function connectRoom(options:Options){
   }
   return {
     id:uid,
+    async order(drink:string){
+      if(closed)throw Error('방에 다시 입장해주세요.');
+      if(!connected)throw Error('다시 연결한 후 주문해주세요.');
+      drink=drink.trim();
+      if(!drink||drink.length>160)throw Error('메뉴를 다시 선택해주세요.');
+      const previousDrink=profile.drink;
+      profile.drink=drink;
+      try{await update(member,{drink})}
+      catch(error){profile.drink=previousDrink;throw error}
+      if(closed)throw Error('방에 다시 입장해주세요.');
+    },
     async send(body:string,recipient:string,messageId:string){
       if(closed)throw Error('방에 다시 입장해주세요.');
       if(!connected)throw Error('다시 연결한 후 메시지를 보내주세요.');

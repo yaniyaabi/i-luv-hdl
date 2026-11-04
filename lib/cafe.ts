@@ -12,3 +12,4 @@ export const menu=[
 
 // Origins, rather than tea cultivars or marketing grades.
 export const matchas=['Uji Matcha','Nishio Matcha','Yame Matcha','Kagoshima Matcha','Jeju Matcha'];
+export const beans=['Panama Geisha','Hawaiian Kona','Ethiopia Guji','Ethiopia Yirgacheffe Aricha','Ethiopia Yirgacheffe Koke Honey'];
