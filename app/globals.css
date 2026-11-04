@@ -53,3 +53,18 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 .game-chat .chat-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;padding:0 5px;border-radius:12px;background:#cd4544;color:#fff;font-size:10px;font-weight:600;line-height:1;text-shadow:none;animation:chat-notification .8s ease-out 2}
 .game-chat.chat-minimized.has-unread{width:190px}
 @keyframes chat-notification{from{box-shadow:0 0 0 0 #cd454455}to{box-shadow:0 0 0 6px #cd454400}}
+/* The focus table follows the people currently in the same room. */
+.room-drinks{display:flex;justify-content:center;align-items:flex-start;max-width:100%}
+.room-drink{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;min-width:0;margin:0}
+.room-drinks-solo .bean-caption{margin-top:0}
+.room-drinks-shared{justify-content:flex-start;gap:24px;width:max-content;max-width:min(100%,760px);margin-top:12px;padding:3px 6px 10px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:#b5a5874d transparent}
+.room-drinks-shared .room-drink{width:174px}
+.with-chat .room-drinks-shared .shared-drink-cup{display:block;width:170px;height:165px;object-fit:contain;margin:0;filter:drop-shadow(0 7px 0 #00000005)}
+.shared-drink-details{display:flex;flex-direction:column;align-items:center;gap:3px;width:100%;margin-top:8px;color:#777;font-size:10px;line-height:1.5}
+.shared-drink-details strong{max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:12px;font-weight:500;color:#554e42}
+.shared-drink-details strong span{font-size:10px;color:#938873}
+.shared-drink-details>span{max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.shared-drink-details small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;font-size:9px;line-height:1.5;max-width:100%;padding:2px 6px;background:#ffffffb0}
+.room-drinks-shared .room-drink-fallback{display:grid!important;place-items:center;font-size:66px}
+@media(max-height:760px) and (min-width:761px){.with-chat .has-company .big-clock{font-size:96px}.with-chat .has-company .guest-name{margin-top:8px}.with-chat .room-drinks-shared .shared-drink-cup{height:145px}}
+@media(max-width:760px){.with-chat .focus-content.has-company{top:18%}.with-chat .has-company .big-clock{font-size:74px}.room-drinks-shared{gap:12px;margin-top:8px;max-width:100%;padding:2px 4px 8px}.room-drinks-shared .room-drink{width:126px}.with-chat .room-drinks-shared .shared-drink-cup{width:122px;height:100px}.shared-drink-details{font-size:9px;margin-top:6px;gap:2px}.shared-drink-details strong{font-size:11px}.shared-drink-details small{font-size:8px;padding:2px 4px}}

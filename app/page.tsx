@@ -2,6 +2,7 @@
 import {useState,useEffect,useRef} from 'react';
 import MusicPlayer,{soundtracks} from '../components/music-player';
 import RoomChat,{type RoomMessage,type Person} from '../components/room-chat';
+import RoomDrinks from '../components/room-drinks';
 import {menu as drinks} from '../lib/cafe';
 import {connectRoom,roomError,type CafeRoom} from '../lib/firebase-room';
 import {ArrowLeft,ArrowRight,Volume2,VolumeX,Play,Pause,Square,Users,Copy,LogOut,X,Settings2,Headphones} from 'lucide-react';
@@ -20,6 +21,7 @@ export default function Home(){
  const room=useRef<CafeRoom|null>(null);
  const leaving=useRef<Promise<void>|null>(null);
  const isCoffee=drinks[drinkIndex].coffee,isTea=false,drink=drinks[drinkIndex].name+(isCoffee?' · '+bean:'');
+ const friends=joined?people.filter(person=>person.id!==id.current):[];
  useEffect(()=>()=>{void room.current?.close().catch(()=>{})},[]);
  useEffect(()=>{
   const bell=new Audio(import.meta.env.BASE_URL+'audio/cafe-door-bell.mp3');bell.preload='auto';bell.volume=.65;bell.load();doorBell.current=bell;
@@ -62,7 +64,7 @@ export default function Home(){
  <section className="focus-stage"><img className="room-bg" src={root+'focus-bg.png'} alt="손그림 카페 공간"/>
  <span className="view-label focus-label">focus</span>
  <button className="space-label" onClick={()=>setDrawer(true)}>커피숍{joined?' · '+code:''}</button>
- <div className="focus-content"><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<Cup index={drinkIndex} className="hero-cup"/>{isCoffee&&<span className="bean-caption">{bean}</span>}</div>
+ <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomDrinks ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownBean={isCoffee?bean:undefined} friends={friends}/></div>
  <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0&&duration!==0){setSeconds(duration*60);}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>{setRunning(false);setSeconds(duration*60);}}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&duration!==0&&<span role="status" className="done">잘했어요. 잠시 쉬어갈까요?</span>}</div>
  </section><RoomChat receivedCount={receivedCount} joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{if(!room.current)throw Error('방에 먼저 입장해주세요.');await room.current.send(body,recipient,messageId)}}/>
  {soundIndex>=0&&<MusicPlayer key={soundIndex} index={soundIndex} onClose={()=>setSoundIndex(-1)}/>}
