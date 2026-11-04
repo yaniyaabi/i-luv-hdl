@@ -9,7 +9,7 @@ export default function SessionRenewal({initial,notice,onClose,onOrder}:{initial
  const [order,setOrder]=useState(initial),[picked,setPicked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const panel=useRef<HTMLDivElement>(null),title=useRef<HTMLHeadingElement>(null);
  const item=menu[order.index],isMatcha=item.matcha===true,hasOrigin=item.coffee||isMatcha;
- const durations=item.dessert?[10,20,40]:[25,45,60,0];
+ const durations=item.dessert?[10,20,40]:[25,45,60];
  useEffect(()=>{
   const previous=document.activeElement as HTMLElement|null;
   return()=>{if(previous?.isConnected)previous.focus()};
@@ -38,9 +38,9 @@ export default function SessionRenewal({initial,notice,onClose,onOrder}:{initial
   </>:<>
    <span className="renewal-eyebrow">one more, at your own pace</span>
    <h2 ref={title} id="renewal-title" tabIndex={-1}>{step==='menu'?'이번에는 뭘 드릴까요?':step==='origin'?(isMatcha?'choose your matcha':'choose your coffee beans'):'얼마나 더 머무실래요?'}</h2>
-   {step==='menu'&&<div className="renewal-menu">{menu.map((drink,index)=><button key={drink.name} aria-pressed={picked&&order.index===index} onClick={()=>{const options=drink.dessert?[10,20,40]:[25,45,60,0];setOrder({...order,index,duration:options.includes(order.duration)?order.duration:options[0]});setPicked(true)}}><img src={root+drink.img} alt={drink.ko}/><span>{drink.name}</span>{picked&&order.index===index&&<i aria-hidden="true">✓</i>}</button>)}</div>}
+   {step==='menu'&&<div className="renewal-menu">{menu.map((drink,index)=><button key={drink.name} aria-pressed={picked&&order.index===index} onClick={()=>{const options=drink.dessert?[10,20,40]:[25,45,60];setOrder({...order,index,duration:options.includes(order.duration)?order.duration:options[0]});setPicked(true)}}><img src={root+drink.img} alt={drink.ko}/><span>{drink.name}</span>{picked&&order.index===index&&<i aria-hidden="true">✓</i>}</button>)}</div>}
    {step==='origin'&&<div className="renewal-origin"><img src={root+(isMatcha?'matcha-tray.png':'coffee-tray.png')} alt={isMatcha?'말차 도구가 놓인 트레이':'커피가 놓인 트레이'}/><div role="group" aria-label={isMatcha?'추가 주문 말차 선택':'추가 주문 원두 선택'}>{(isMatcha?matchas:beans).map(origin=><button key={origin} aria-pressed={(isMatcha?order.matcha:order.bean)===origin} onClick={()=>setOrder({...order,[isMatcha?'matcha':'bean']:origin})}><span>{origin}</span><span aria-hidden="true">{(isMatcha?order.matcha:order.bean)===origin?'✓':''}</span></button>)}</div></div>}
-   {step==='time'&&<><img className="renewal-order-cup" src={root+item.img} alt={item.ko}/><div className="duration-list renewal-durations">{durations.map((duration,index)=><button key={duration} disabled={busy} aria-pressed={duration===order.duration} className={duration===order.duration?'chosen':''} onClick={()=>setOrder({...order,duration})}><span>{['tall','grande','venti','unlimited'][index]}</span><i/><span>{duration===0?'∞':duration+' minutes'}</span></button>)}</div><p className="renewal-time-note">주문하면 선택한 시간으로 바로 시작해요.</p></>}
+   {step==='time'&&<><img className="renewal-order-cup" src={root+item.img} alt={item.ko}/><div className="duration-list renewal-durations">{durations.map((duration,index)=><button key={duration} disabled={busy} aria-pressed={duration===order.duration} className={duration===order.duration?'chosen':''} onClick={()=>setOrder({...order,duration})}><span>{['tall','grande','venti'][index]}</span><i/><span>{duration+' minutes'}</span></button>)}</div><p className="renewal-time-note">주문하면 선택한 시간으로 바로 시작해요.</p></>}
    <div className="renewal-actions"><button className="renewal-back" disabled={busy} onClick={()=>step==='menu'?onClose():setStep(step==='origin'?'menu':hasOrigin?'origin':'menu')}>{step==='menu'?'나중에 주문하기':'← back'}</button><button className="black renewal-primary" disabled={busy||(step==='menu'&&!picked)} onClick={()=>step==='time'?void confirm():setStep(step==='menu'&&hasOrigin?'origin':'time')}>{step==='time'?(busy?'주문하는 중…':'주문하고 시작'):'next'}</button></div>
    {error&&<p role="alert" className="renewal-error">{error}</p>}
   </>}
