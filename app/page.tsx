@@ -4,7 +4,6 @@ import MusicPlayer,{soundtracks} from '../components/music-player';
 import RoomChat,{type RoomMessage,type Person} from '../components/room-chat';
 import RoomDrinks from '../components/room-drinks';
 import MemeGotgan from '../components/meme-gotgan';
-import AsmrAlbum from '../components/asmr-album';
 import SessionRenewal,{type CafeOrder} from '../components/session-renewal';
 import {menu as drinks,matchas,beans} from '../lib/cafe';
 import {connectRoom,roomError,type CafeRoom} from '../lib/firebase-room';
@@ -17,7 +16,7 @@ function Cup({index,className=''}:{index:number,className?:string}){return <img 
 export default function Home(){
  const [step,setStep]=useState('entry'),[drinkIndex,setDrinkIndex]=useState(0),[picked,setPicked]=useState(false),[bean,setBean]=useState(beans[0]),[matcha,setMatcha]=useState(matchas[0]),[duration,setDuration]=useState(25),[name,setName]=useState(''),[task,setTask]=useState(''),[code,setCode]=useState(''),[joined,setJoined]=useState(false),[people,setPeople]=useState<Person[]>([]),[messages,setMessages]=useState<RoomMessage[]>([]),[seconds,setSeconds]=useState(1500),[running,setRunning]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[drawer,setDrawer]=useState(false),[soundIndex,setSoundIndex]=useState(-1),[copied,setCopied]=useState(false);
  const [receivedCount,setReceivedCount]=useState(0);
- const [view,setView]=useState<'focus'|'memes'|'asmr'>('focus');
+ const [view,setView]=useState<'focus'|'memes'>('focus');
  const [renewal,setRenewal]=useState<'notice'|'order'|null>(null);
  const doorBell=useRef<HTMLAudioElement|null>(null);
  const id=useRef('');
@@ -71,16 +70,15 @@ export default function Home(){
  {step==='timer'&&<><Cup index={drinkIndex} className="tiny-cup"/><h1 className="sr-only">집중 시간 선택</h1><div className="duration-list">{durations.map((m,i)=><button key={m} aria-pressed={duration===m} className={duration===m?'chosen':''} onClick={()=>setDuration(m)}><span>{['tall','grande','venti'][i]}</span><i/><span>{m+' minutes'}</span></button>)}</div><Next onClick={()=>setStep('name')}/><Back onClick={()=>setStep(isCoffee||isMatcha?'bean':'drink')}/></>}
  {step==='name'&&<form onSubmit={start} className="name-form"><div className="receipt"><p>DRINK FOR</p><input aria-label="닉네임" maxLength={16} placeholder="your name" value={name} onChange={e=>setName(e.target.value)}/><span>1X {duration+' MIN'} {drinks[drinkIndex].name.toUpperCase()}</span>{selection&&<span>{selection}</span>}<span>ORDER #{code||'001'}</span><div className="perforation"/><label>ROOM NUMBER <small>같은 번호를 입력하면 함께 입장해요.</small><input aria-label="방 번호" inputMode="numeric" pattern="[0-9]{4,8}" maxLength={8} placeholder="숫자 4~8자리 · 혼자라면 비워두세요" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label><label className="task-label">I WILL...<input aria-label="오늘 할 일" placeholder="오늘 집중할 일 (선택)" maxLength={80} value={task} onChange={e=>setTask(e.target.value)}/></label></div><button className="black next" disabled={busy} type="submit">{busy?'opening…':'start'}</button>{error&&<p role="alert" className="error">{error}</p>}<Back onClick={()=>setStep('timer')}/></form>}
  </div><span className="ordering-foot">sip, breathe, and take your time.</span></main>;
- return <main className={'immersive with-chat '+(view==='memes'?'meme-view':view==='asmr'?'asmr-view':'')}>
- {view!=='focus'&&<nav className={'room-navigation to-focus'+(view==='asmr'?' from-asmr':'')} aria-label="이전 카페 화면"><button aria-label={view==='asmr'?'밈 곳간으로 돌아가기':'focus로 돌아가기'} aria-controls={view==='asmr'?'meme-panel':'focus-panel'} title={view==='asmr'?'meme gotgan':'focus'} onClick={()=>setView(view==='asmr'?'memes':'focus')}><ArrowLeft size={27}/></button></nav>}
- {view!=='asmr'&&<nav className="room-navigation to-memes" aria-label="다음 카페 화면"><button aria-label={view==='focus'?'밈 곳간으로 이동':'ASMR 영상 보러 가기'} aria-controls={view==='focus'?'meme-panel':'asmr-panel'} title={view==='focus'?'meme gotgan':'ASMR'} onClick={()=>{if(view==='memes'){setSoundIndex(-1);setView('asmr')}else setView('memes')}}><ArrowRight size={27}/></button></nav>}
+ return <main className={'immersive with-chat '+(view==='memes'?'meme-view':'')}>
+ {view==='memes'&&<nav className="room-navigation to-focus" aria-label="이전 카페 화면"><button aria-label="focus로 돌아가기" aria-controls="focus-panel" title="focus" onClick={()=>setView('focus')}><ArrowLeft size={27}/></button></nav>}
+ {view==='focus'&&<nav className="room-navigation to-memes" aria-label="다음 카페 화면"><button aria-label="밈 곳간으로 이동" aria-controls="meme-panel" title="meme gotgan" onClick={()=>setView('memes')}><ArrowRight size={27}/></button></nav>}
  {view==='memes'&&<MemeGotgan name={name}/>}
- {view==='asmr'&&<AsmrAlbum/>}
  <section className="focus-stage" id="focus-panel" role="region" aria-label="focus" hidden={view!=='focus'}><img className="room-bg" src={root+'focus-bg.png'} alt="손그림 카페 공간"/>
  <button className="space-label" onClick={()=>setDrawer(true)}>커피숍{joined?' · '+code:''}</button>
  <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomDrinks ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownSelection={selection||undefined} friends={friends}/></div>
  <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0){setRenewal('notice');return;}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>{setRunning(false);setSeconds(duration*60);}}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&<button className="done renewal-reminder" onClick={()=>setRenewal('order')}>시간이 다 됐어요 · 한 잔 더 주문하기</button>}</div>
- </section><div className="room-chat-layer" hidden={view==='asmr'}><RoomChat receivedCount={receivedCount} joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{if(!room.current)throw Error('방에 먼저 입장해주세요.');await room.current.send(body,recipient,messageId)}}/></div>
+ </section><RoomChat receivedCount={receivedCount} joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{if(!room.current)throw Error('방에 먼저 입장해주세요.');await room.current.send(body,recipient,messageId)}}/>
  {soundIndex>=0&&<MusicPlayer key={soundIndex} index={soundIndex} onClose={()=>setSoundIndex(-1)}/>}
  {error&&<div role="alert" className="room-error">{error}</div>}
  {renewal&&<SessionRenewal initial={{index:drinkIndex,bean,matcha,duration}} notice={renewal==='notice'} onClose={()=>setRenewal(null)} onOrder={renewSession}/>}
