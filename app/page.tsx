@@ -36,7 +36,7 @@ export default function Home(){
   setReceivedCount(0);
   if(leaving.current)await leaving.current;
   if(room.current)await room.current.close();
-  const client=await connectRoom({code,name:name.trim()||'guest',drink,onPeople:setPeople,onMessages:setMessages,onStatus:setError,onIncoming:count=>setReceivedCount(current=>current+count),onReset:()=>setReceivedCount(0)});
+  const client=await connectRoom({code,name:name.trim()||'guest',drink,task,onPeople:setPeople,onMessages:setMessages,onStatus:setError,onIncoming:count=>setReceivedCount(current=>current+count),onReset:()=>setReceivedCount(0)});
   id.current=client.id;room.current=client;setJoined(true);setError('');
  }
  useEffect(()=>{if(!running)return;const t=setInterval(()=>setSeconds(s=>Math.max(0,s-1)),1000);return()=>clearInterval(t)},[running]);

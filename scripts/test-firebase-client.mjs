@@ -21,10 +21,12 @@ async function until(check,label){
 }
 const a=client(),b=client();
 try{
- const alice=await a.call('join',{code,name:'SDK Alice',drink:'americano'});
+ const alice=await a.call('join',{code,name:'SDK Alice',drink:'americano',task:'수학 문제 20개 풀기'});
  const bob=await b.call('join',{code,name:'SDK Bob',drink:'matcha latte'});
  await until(()=>a.state.people.length===2&&b.state.people.length===2,'both members visible');
  assert.ok(a.state.messages.some(m=>m.body==='SDK Bob님이 들어왔습니다.'));
+ assert.equal(b.state.people.find(p=>p.id===alice.id)?.task,'수학 문제 20개 풀기','friend goal is shared');
+ assert.equal(a.state.people.find(p=>p.id===bob.id)?.task,'','blank goals remain empty');
  const id=randomUUID();
  await a.call('send',{code,messageId:id,body:'public SDK test',recipient:''});
  await until(()=>b.state.messages.some(m=>m.id===id),'public message delivered');
@@ -42,12 +44,14 @@ try{
  await a.call('order',{drink:'pudding'});
  await until(()=>a.state.people.find(p=>p.id===alice.id)?.drink==='pudding'&&b.state.people.find(p=>p.id===alice.id)?.drink==='pudding','new order updates the same membership for everyone');
  assert.equal(a.state.people.length,2,'ordering does not leave the room');
+ assert.equal(b.state.people.find(p=>p.id===alice.id)?.task,'수학 문제 20개 풀기','new order preserves the goal');
  assert.ok(b.state.messages.some(m=>m.id===id)&&b.state.messages.some(m=>m.id===dm),'ordering preserves public and private chat');
  assert.equal(b.state.received,2,'order announcements do not count as incoming chat');
  await b.call('offline');
  await until(()=>a.state.people.length===1,'onDisconnect removes absent member');
  await b.call('online');
  await until(()=>a.state.people.length===2&&b.state.people.length===2&&b.state.status==='','reconnect restores presence and listeners');
+ assert.equal(b.state.people.find(p=>p.id===alice.id)?.task,'수학 문제 20개 풀기','goals stay visible after reconnect');
  const reply=randomUUID();
  await b.call('send',{code,messageId:reply,body:'back online',recipient:''});
  await until(()=>a.state.messages.some(m=>m.id===reply),'chat works after reconnect');
@@ -60,7 +64,7 @@ try{
  assert.equal(b.state.messages.some(m=>m.id===cancelledId),false,'departed client cannot post into a later session');
  assert.ok(b.state.messages.some(m=>m.id===id),'public history stays while occupied');
  assert.ok(b.state.messages.some(m=>m.id===dm),'whispers stay while occupied');
- await a.call('join',{code,name:'SDK Alice',drink:'americano'});
+ await a.call('join',{code,name:'SDK Alice',drink:'americano',task:'수학 문제 20개 풀기'});
  await until(()=>a.state.people.length===2&&a.state.messages.some(m=>m.id===id),'rejoin occupied room preserves messages');
  assert.equal(a.state.received,0,'loading existing public and private history does not notify');
 
@@ -68,7 +72,7 @@ try{
  await Promise.all([a.call('close'),b.call('close')]);
  const empty=await b.call('probeEmpty',{code});
  assert.equal(empty.messages,null,'last exit physically clears both histories');
- await a.call('join',{code,name:'SDK Alice',drink:'americano'});
+ await a.call('join',{code,name:'SDK Alice',drink:'americano',task:'수학 문제 20개 풀기'});
  await b.call('join',{code,name:'SDK Bob',drink:'matcha latte'});
  await until(()=>a.state.people.length===2&&b.state.people.length===2,'fresh room has both members');
  assert.equal(a.state.messages.some(m=>m.kind==='chat'),false,'fresh session has no old public chat or whispers');
@@ -87,7 +91,7 @@ try{
  await b.call('online');
  await until(()=>b.state.status===''&&b.state.people.length===2,'second reconnect joins fresh session');
  assert.equal(b.state.messages.some(m=>m.kind==='chat'),false,'no stale whispers or public messages after reconnect');
- console.log('PASS: chat lifecycle and privacy; incoming public/whisper notifications; no self, duplicate, or history notifications.');
+ console.log('PASS: shared goals, blank-goal handling, goal persistence after ordering/reconnect; chat lifecycle and privacy; incoming public/whisper notifications; no self, duplicate, or history notifications.');
 }finally{
  const cleanup=[];
  await a.call('cleanup').catch(error=>cleanup.push(error));

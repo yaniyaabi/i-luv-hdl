@@ -11,9 +11,9 @@ let login:Promise<string>|undefined;
 export function visitor(){
   return login ??= signInAnonymously(auth).then(({user})=>user.uid).catch(error=>{login=undefined;throw error});
 }
-type Profile={name:string,drink:string,joinedAt:number};
+type Profile={name:string,drink:string,task?:string,joinedAt:number};
 type StoredMessage=Omit<RoomMessage,'id'>;
-type Options={code:string,name:string,drink:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void};
+type Options={code:string,name:string,drink:string,task?:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void};
 
 export function roomError(error:unknown){
   const code=(error as {code?:string})?.code || '';
@@ -32,7 +32,7 @@ export async function connectRoom(options:Options){
   if(!/^\d{4,8}$/.test(code))throw Error('방 번호는 숫자 4~8자리로 입력해주세요.');
   const uid=await visitor();
   const base='rooms/'+code,room=ref(db,base),member=ref(db,base+'/members/'+uid);
-  const profile={name:name.trim().slice(0,16)||'guest',drink:drink.slice(0,160),joinedAt:serverTimestamp()};
+  const profile={name:name.trim().slice(0,16)||'guest',drink:drink.slice(0,160),task:(options.task||'').trim().slice(0,80),joinedAt:serverTimestamp()};
   const disconnect=onDisconnect(member);
   async function enter(){
     // Rules check this whole update against the latest server state. Clearing
@@ -119,7 +119,7 @@ export async function connectRoom(options:Options){
       }
       for(const [id,p] of Object.entries(previous||{}))if(!current[id])announce(p.name+'님이 나갔습니다.');
       previous=current;
-      if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink})));
+      if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink,task:p.task||''})));
       emit();
     },failed));
     listeners.push(onValue(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100)),snapshot=>{publicMessages=fromSnapshot(snapshot);trackIncoming(publicMessages,'public');emit()},failed));

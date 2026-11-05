@@ -36,6 +36,15 @@ try{
   for(const user of [a,b,c])await put(user,'rooms/'+room+'/members/'+user.uid,profile(user));
   await put(d,'rooms/'+otherRoom+'/members/'+d.uid,profile(d));
   assert.equal(Object.keys((await request(a,'rooms/'+room+'/members')).body).length,3);
+  const taskPath='rooms/'+room+'/members/'+a.uid+'/task';
+  assert.equal((await request(a,taskPath,'PUT','기출 문제 풀기')).ok,true,'optional goal can be added to a legacy profile');
+  assert.equal((await request(b,taskPath)).body,'기출 문제 풀기','room member reads the goal');
+  denied(await request(d,taskPath));
+  denied(await request(b,taskPath,'PUT','tampered goal'));
+  denied(await request(a,taskPath,'PUT','x'.repeat(81)));
+  denied(await request(a,taskPath,'PUT',123));
+  assert.equal((await request(a,taskPath,'PUT','')).ok,true,'blank goal is allowed');
+
   const publicPath='rooms/'+room+'/messages/'+randomUUID();
   await put(a,publicPath,message(a));
   assert.equal((await request(b,publicPath)).body.sender,a.uid);
@@ -66,7 +75,7 @@ try{
   await request(c,'rooms/'+room+'/members/'+c.uid,'DELETE');
   denied(await request(c,publicPath));
   denied(await request(c,'rooms/'+room+'/messages/'+randomUUID(),'PUT',message(c)));
-  console.log('PASS: anonymous entry, shared presence, public chat, room isolation, private-message privacy, spoof/tamper/length rejection, membership revocation, and occupied-room cleanup rejection.');
+  console.log('PASS: optional goal sharing, privacy and length validation; anonymous entry, shared presence, public chat, room isolation, private-message privacy, spoof/tamper/length rejection, membership revocation, and occupied-room cleanup rejection.');
 }finally{
   // Messages must be removed while their sender is still a member.
   for(const {user,path} of written.filter(x=>!x.path.includes('/members/'))){

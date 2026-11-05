@@ -20,6 +20,9 @@
             },
             "$other": {
               ".validate": false
+            },
+            "task": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
             }
           }
         },
