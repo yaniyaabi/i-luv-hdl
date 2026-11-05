@@ -10,12 +10,21 @@ parentPort.on('message',async ({seq,action,...params})=>{
   let result;
   if(action==='join'){
     parentPort.postMessage({event:'notification-reset'});
-    room=await connectRoom({...params,onPeople:people=>parentPort.postMessage({event:'people',people}),onMessages:messages=>parentPort.postMessage({event:'messages',messages}),onStatus:status=>parentPort.postMessage({event:'status',status}),onIncoming:count=>parentPort.postMessage({event:'incoming',count}),onReset:()=>parentPort.postMessage({event:'notification-reset'})});
+    room=await connectRoom({...params,onPeople:people=>parentPort.postMessage({event:'people',people}),onMessages:messages=>parentPort.postMessage({event:'messages',messages}),onGifts:gifts=>parentPort.postMessage({event:'gifts',gifts}),onLetters:letters=>parentPort.postMessage({event:'letters',letters}),onStatus:status=>parentPort.postMessage({event:'status',status}),onIncoming:count=>parentPort.postMessage({event:'incoming',count}),onReset:()=>parentPort.postMessage({event:'notification-reset'})});
     result={id:room.id};
   }else if(action==='order'){
     await room.order(params.drink);
   }else if(action==='send'){
     await room.send(params.body,params.recipient,params.messageId);
+  }else if(action==='cookie')await room.cookie(params.recipient,params.messageId);
+  else if(action==='letter')await room.letter(params.recipient,params.body,params.messageId);
+  else if(action==='openLetter')result=await room.openLetter(params.messageId);
+  else if(action==='finishFocus')await room.finishFocus();
+  else if(action==='restartFocus')await room.restartFocus();
+  else if(action==='rest'){
+    const token=await getAuth().currentUser.getIdToken();
+    const response=await fetch(firebaseConfig.databaseURL+'/'+params.path+'.json?auth='+encodeURIComponent(token),{method:params.method||'GET',headers:{'Content-Type':'application/json'},...(params.body===undefined?{}:{body:JSON.stringify(params.body)})});
+    result={ok:response.ok,status:response.status,body:await response.json()};
   }else if(action==='offline')goOffline(getDatabase());
   else if(action==='online')goOnline(getDatabase());
   else if(action==='close')await room.close();

@@ -8,7 +8,7 @@
           ".read": "auth != null && data.child(auth.uid).exists()",
           "$uid": {
             ".write": "auth != null && auth.uid === $uid && $code.matches(/^[0-9]{4,8}$/) && (!newData.exists() || data.exists() || root.child('rooms').child($code).child('members').exists() || (!newData.parent().parent().child('messages').exists() && !newData.parent().parent().child('inboxes').exists()))",
-            ".validate": "newData.hasChildren(['name','drink','joinedAt'])",
+            ".validate": "newData.hasChildren(['name','drink','joinedAt']) && ((!newData.child('focusRound').exists() && !newData.child('finishedRound').exists()) || (newData.hasChildren(['focusRound','finishedRound']) && newData.child('focusRound').val() === newData.child('finishedRound').val()+1))",
             "name": {
               ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 16"
             },
@@ -23,6 +23,12 @@
             },
             "task": {
               ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "focusRound": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 1000000 && (!data.exists() || newData.val() === data.val() || newData.val() === data.val()+1)"
+            },
+            "finishedRound": {
+              ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000000 && (!data.exists() || newData.val() === data.val() || newData.val() === data.val()+1)"
             }
           }
         },
@@ -100,6 +106,92 @@
         },
         "$other": {
           ".validate": false
+        },
+        "gifts": {
+          ".read": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists()",
+          ".write": "auth != null && $code.matches(/^[0-9]{4,8}$/) && !newData.exists() && (!root.child('rooms').child($code).child('members').exists() || !newData.parent().child('members').exists())",
+          ".indexOn": [
+            "created"
+          ],
+          "$id": {
+            ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && $id.matches(/^[A-Za-z0-9_-]{20,64}$/) && !data.exists() && newData.child('sender').val() === auth.uid",
+            ".validate": "newData.hasChildren(['kind','sender','senderName','recipient','recipientName','created'])",
+            "sender": {
+              ".validate": "newData.val() === auth.uid"
+            },
+            "senderName": {
+              ".validate": "newData.val() === root.child('rooms').child($code).child('members').child(auth.uid).child('name').val()"
+            },
+            "recipient": {
+              ".validate": "newData.isString() && newData.val() !== auth.uid && root.child('rooms').child($code).child('members').child(newData.val()).exists()"
+            },
+            "recipientName": {
+              ".validate": "newData.val() === root.child('rooms').child($code).child('members').child(newData.parent().child('recipient').val()).child('name').val()"
+            },
+            "created": {
+              ".validate": "newData.isNumber() && newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            },
+            "kind": {
+              ".validate": "newData.val() === 'cookie'"
+            }
+          }
+        },
+        "letterBoxes": {
+          ".write": "auth != null && $code.matches(/^[0-9]{4,8}$/) && !newData.exists() && (!root.child('rooms').child($code).child('members').exists() || !newData.parent().child('members').exists())",
+          "$uid": {
+            ".read": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && auth.uid === $uid",
+            ".indexOn": [
+              "created"
+            ],
+            "$id": {
+              ".read": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && (!data.exists() || data.child('sender').val() === auth.uid)",
+              ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && $id.matches(/^[A-Za-z0-9_-]{20,64}$/) && !data.exists() && newData.child('sender').val() === auth.uid",
+              ".validate": "newData.hasChildren(['sender','senderName','recipient','recipientName','round','created']) && newData.child('recipient').val() === $uid && newData.parent().parent().parent().child('letterBodies').child($uid).child($id).child('sender').val() === auth.uid && newData.parent().parent().parent().child('letterBodies').child($uid).child($id).child('body').isString()",
+              "sender": {
+                ".validate": "newData.val() === auth.uid"
+              },
+              "senderName": {
+                ".validate": "newData.val() === root.child('rooms').child($code).child('members').child(auth.uid).child('name').val()"
+              },
+              "recipient": {
+                ".validate": "newData.isString() && newData.val() !== auth.uid && root.child('rooms').child($code).child('members').child(newData.val()).exists()"
+              },
+              "recipientName": {
+                ".validate": "newData.val() === root.child('rooms').child($code).child('members').child(newData.parent().child('recipient').val()).child('name').val()"
+              },
+              "created": {
+                ".validate": "newData.isNumber() && newData.val() === now"
+              },
+              "$other": {
+                ".validate": false
+              },
+              "round": {
+                ".validate": "newData.isNumber() && newData.val() === root.child('rooms').child($code).child('members').child($uid).child('focusRound').val()"
+              }
+            }
+          }
+        },
+        "letterBodies": {
+          ".write": "auth != null && $code.matches(/^[0-9]{4,8}$/) && !newData.exists() && (!root.child('rooms').child($code).child('members').exists() || !newData.parent().child('members').exists())",
+          "$uid": {
+            "$id": {
+              ".read": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && (data.child('sender').val() === auth.uid || (auth.uid === $uid && root.child('rooms').child($code).child('letterBoxes').child($uid).child($id).exists() && root.child('rooms').child($code).child('members').child(auth.uid).child('finishedRound').val() >= root.child('rooms').child($code).child('letterBoxes').child($uid).child($id).child('round').val()))",
+              ".write": "auth != null && root.child('rooms').child($code).child('members').child(auth.uid).exists() && $id.matches(/^[A-Za-z0-9_-]{20,64}$/) && !data.exists() && newData.child('sender').val() === auth.uid",
+              ".validate": "newData.hasChildren(['sender','body']) && newData.parent().parent().parent().child('letterBoxes').child($uid).child($id).child('sender').val() === auth.uid && newData.parent().parent().parent().child('letterBoxes').child($uid).child($id).child('recipient').val() === $uid",
+              "sender": {
+                ".validate": "newData.val() === auth.uid"
+              },
+              "body": {
+                ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          }
         }
       }
     },

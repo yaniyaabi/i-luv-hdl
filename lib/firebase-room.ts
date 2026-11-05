@@ -3,6 +3,7 @@ import {initializeAuth,inMemoryPersistence,signInAnonymously} from 'firebase/aut
 import {getDatabase,ref,set,get,update,remove,onValue,onDisconnect,query,orderByChild,limitToLast,serverTimestamp,type Unsubscribe} from 'firebase/database';
 import {firebaseConfig} from './firebase-config.ts';
 import type {Person,RoomMessage} from '../components/room-chat';
+import type {RoomGift,RoomLetter} from './room-companions';
 
 const app=initializeApp(firebaseConfig);
 const auth=initializeAuth(app,{persistence:inMemoryPersistence});
@@ -11,9 +12,9 @@ let login:Promise<string>|undefined;
 export function visitor(){
   return login ??= signInAnonymously(auth).then(({user})=>user.uid).catch(error=>{login=undefined;throw error});
 }
-type Profile={name:string,drink:string,task?:string,joinedAt:number};
+type Profile={name:string,drink:string,task?:string,joinedAt:number,focusRound?:number,finishedRound?:number};
 type StoredMessage=Omit<RoomMessage,'id'>;
-type Options={code:string,name:string,drink:string,task?:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void};
+type Options={code:string,name:string,drink:string,task?:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void,onGifts?:(gifts:RoomGift[])=>void,onLetters?:(letters:RoomLetter[])=>void};
 
 export function roomError(error:unknown){
   const code=(error as {code?:string})?.code || '';
@@ -32,7 +33,8 @@ export async function connectRoom(options:Options){
   if(!/^\d{4,8}$/.test(code))throw Error('방 번호는 숫자 4~8자리로 입력해주세요.');
   const uid=await visitor();
   const base='rooms/'+code,room=ref(db,base),member=ref(db,base+'/members/'+uid);
-  const profile={name:name.trim().slice(0,16)||'guest',drink:drink.slice(0,160),task:(options.task||'').trim().slice(0,80),joinedAt:serverTimestamp()};
+  const profile={name:name.trim().slice(0,16)||'guest',drink:drink.slice(0,160),task:(options.task||'').trim().slice(0,80),joinedAt:serverTimestamp(),focusRound:1,finishedRound:0};
+  const clearedHistory={messages:null,inboxes:null,gifts:null,letterBoxes:null,letterBodies:null};
   const disconnect=onDisconnect(member);
   async function enter(){
     // Rules check this whole update against the latest server state. Clearing
@@ -40,7 +42,7 @@ export async function connectRoom(options:Options){
     for(let attempt=0;attempt<5;attempt++){
       const nextProfile={...profile,joinedAt:serverTimestamp()};
       try{
-        await update(room,{['members/'+uid]:nextProfile,messages:null,inboxes:null});
+        await update(room,{['members/'+uid]:nextProfile,...clearedHistory});
         previous=null;system=[];publicMessages=[];whispers=[];
         hasBaseline=false;seenMessages.clear();options.onReset?.();
         return;
@@ -55,14 +57,14 @@ export async function connectRoom(options:Options){
   }
   async function depart(){
     try{
-      // Remove our presence and both histories together, only if nobody remains.
-      await update(room,{['members/'+uid]:null,messages:null,inboxes:null});
+      // Remove presence, chat, gifts and notes together only if nobody remains.
+      await update(room,{['members/'+uid]:null,...clearedHistory});
     }catch(error){
       if(!permissionDenied(error))throw error;
       await remove(member);
       // Handles two people leaving at once. Rules reject this if anyone stayed
       // or a new visitor has already begun another session.
-      try{await update(room,{messages:null,inboxes:null})}
+      try{await update(room,clearedHistory)}
       catch(error){if(!permissionDenied(error))throw error}
     }
     await disconnect.cancel();
@@ -74,6 +76,29 @@ export async function connectRoom(options:Options){
   let hasBaseline=false;
   const seenMessages=new Set<string>();
   let firstConnection=true,reconnecting=false,connected=true,lastSent=0;
+  let finishedForSession=false,finishing:Promise<void>|null=null;
+  const available=()=>{if(closed)throw Error('방에 다시 입장해주세요.');if(!connected)throw Error('다시 연결한 후 보내주세요.')};
+  const recipientProfile=(recipient:string,messageId:string)=>{
+    available();
+    if(!/^[\w-]{20,64}$/.test(messageId))throw Error('다시 시도해주세요.');
+    if(recipient===uid)throw Error('함께 있는 사람을 선택해주세요.');
+    const target=previous?.[recipient];
+    if(!target)throw Error('상대방이 방을 나갔어요.');
+    return target;
+  };
+  // Advance once per completed timer, not per order or wall-clock deadline.
+  // Pausing/resetting an unfinished timer therefore never releases a note.
+  function finishFocus(){
+    if(finishing)return finishing;
+    if(finishedForSession)return Promise.resolve();
+    finishing=(async()=>{
+      available();
+      const completed=profile.focusRound;
+      await update(member,{finishedRound:completed,focusRound:completed+1});
+      profile.finishedRound=completed;profile.focusRound=completed+1;finishedForSession=true;
+    })().finally(()=>{finishing=null});
+    return finishing;
+  }
   const emit=()=>{if(!closed)onMessages([...publicMessages,...whispers,...system].sort((a,b)=>a.created-b.created).slice(-100))};
   const announce=(body:string)=>{system.push({id:'system-'+crypto.randomUUID(),kind:'system',sender:'',senderName:'',recipient:'',recipientName:'',body,created:Date.now()});system=system.slice(-100)};
   const failed=(error:unknown)=>{if(!closed)onStatus(roomError(error))};
@@ -119,11 +144,17 @@ export async function connectRoom(options:Options){
       }
       for(const [id,p] of Object.entries(previous||{}))if(!current[id])announce(p.name+'님이 나갔습니다.');
       previous=current;
-      if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink,task:p.task||''})));
+      if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink,task:p.task||'',focusRound:p.focusRound,finishedRound:p.finishedRound})));
       emit();
     },failed));
     listeners.push(onValue(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100)),snapshot=>{publicMessages=fromSnapshot(snapshot);trackIncoming(publicMessages,'public');emit()},failed));
     listeners.push(onValue(query(ref(db,base+'/inboxes/'+uid),orderByChild('created'),limitToLast(100)),snapshot=>{whispers=fromSnapshot(snapshot);trackIncoming(whispers,'private');emit()},failed));
+    if(options.onGifts)listeners.push(onValue(query(ref(db,base+'/gifts'),orderByChild('created'),limitToLast(100)),snapshot=>{
+      const gifts:RoomGift[]=[];snapshot.forEach(child=>{gifts.push({...child.val(),id:child.key!})});if(!closed)options.onGifts?.(gifts);
+    },failed));
+    if(options.onLetters)listeners.push(onValue(query(ref(db,base+'/letterBoxes/'+uid),orderByChild('created'),limitToLast(100)),snapshot=>{
+      const letters:RoomLetter[]=[];snapshot.forEach(child=>{letters.push({...child.val(),id:child.key!})});if(!closed)options.onLetters?.(letters);
+    },failed));
     return true;
   };
   try{
@@ -157,7 +188,38 @@ export async function connectRoom(options:Options){
   }
   return {
     id:uid,
+    finishFocus,
+    async restartFocus(){await finishing;available();finishedForSession=false},
+    async cookie(recipient:string,messageId:string){
+      const target=recipientProfile(recipient,messageId),path=ref(db,base+'/gifts/'+messageId);
+      const existing=await get(path);if(existing.exists()){if(existing.child('sender').val()!==uid)throw Error('다시 시도해주세요.');return}
+      available();
+      await set(path,{kind:'cookie',sender:uid,senderName:profile.name,recipient,recipientName:target.name,created:serverTimestamp()});
+    },
+    async letter(recipient:string,body:string,messageId:string){
+      const target=recipientProfile(recipient,messageId);body=body.trim();
+      if(!body||body.length>500)throw Error('쪽지는 1~500자로 적어주세요.');
+      if(!target.focusRound)throw Error('친구가 새로고침한 뒤 쪽지를 보낼 수 있어요.');
+      const path=base+'/letterBoxes/'+recipient+'/'+messageId;
+      const existing=await get(ref(db,path));if(existing.exists()){if(existing.child('sender').val()!==uid)throw Error('다시 시도해주세요.');return}
+      available();
+      await update(room,{
+        ['letterBoxes/'+recipient+'/'+messageId]:{sender:uid,senderName:profile.name,recipient,recipientName:target.name,round:target.focusRound,created:serverTimestamp()},
+        ['letterBodies/'+recipient+'/'+messageId]:{sender:uid,body},
+      });
+    },
+    async openLetter(messageId:string){
+      await finishing;available();
+      if(!/^[\w-]{20,64}$/.test(messageId))throw Error('쪽지를 다시 선택해주세요.');
+      const meta=await get(ref(db,base+'/letterBoxes/'+uid+'/'+messageId));
+      if(!meta.exists())throw Error('쪽지가 없어요.');
+      if(meta.child('round').val()>profile.finishedRound)throw Error('집중이 끝나면 열 수 있어요.');
+      const body=await get(ref(db,base+'/letterBodies/'+uid+'/'+messageId));
+      if(!body.exists())throw Error('쪽지를 불러오지 못했어요. 다시 시도해주세요.');
+      return body.child('body').val() as string;
+    },
     async order(drink:string){
+      await finishing;
       if(closed)throw Error('방에 다시 입장해주세요.');
       if(!connected)throw Error('다시 연결한 후 주문해주세요.');
       drink=drink.trim();
@@ -167,6 +229,7 @@ export async function connectRoom(options:Options){
       try{await update(member,{drink})}
       catch(error){profile.drink=previousDrink;throw error}
       if(closed)throw Error('방에 다시 입장해주세요.');
+      finishedForSession=false;
     },
     async send(body:string,recipient:string,messageId:string){
       if(closed)throw Error('방에 다시 입장해주세요.');

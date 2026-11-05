@@ -4,7 +4,7 @@ import {beans,matchas,menu} from '../lib/cafe';
 
 const root=import.meta.env.BASE_URL+'reference/';
 export type CafeOrder={index:number,bean:string,matcha:string,duration:number};
-export default function SessionRenewal({initial,notice,onClose,onOrder}:{initial:CafeOrder,notice:boolean,onClose:()=>void,onOrder:(order:CafeOrder)=>Promise<void>}){
+export default function SessionRenewal({initial,notice,onClose,onOrder,readyLetters=0,onOpenLetters}:{initial:CafeOrder,notice:boolean,onClose:()=>void,onOrder:(order:CafeOrder)=>Promise<void>,readyLetters?:number,onOpenLetters?:()=>void}){
  const [step,setStep]=useState<'notice'|'menu'|'origin'|'time'>(notice?'notice':'menu');
  const [order,setOrder]=useState(initial),[picked,setPicked]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const panel=useRef<HTMLDivElement>(null),title=useRef<HTMLHeadingElement>(null),body=useRef<HTMLDivElement>(null);
@@ -34,6 +34,7 @@ export default function SessionRenewal({initial,notice,onClose,onOrder}:{initial
   {step==='notice'?<>
    <span className="renewal-eyebrow">your little coffee break</span><img className="renewal-finished-cup" src={root+menu[initial.index].img} alt={menu[initial.index].ko}/>
    <h2 ref={title} id="renewal-title" tabIndex={-1}>손님, 시간 다 됐습니다.</h2><p className="renewal-subtitle">커피 한 잔 더 주문하실래요?</p>
+   {readyLetters>0&&<button className="renewal-letter" onClick={onOpenLetters}>♡ 도착한 쪽지 보기 · {readyLetters}</button>}
    <button className="black renewal-primary" onClick={()=>setStep('menu')}>한 잔 더 주문하기</button><button className="renewal-later" onClick={onClose}>잠깐 쉬기</button>
   </>:<>
    <header className="renewal-header"><span className="renewal-eyebrow">one more, at your own pace</span>

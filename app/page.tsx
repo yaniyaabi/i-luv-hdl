@@ -2,7 +2,8 @@
 import {useState,useEffect,useRef} from 'react';
 import MusicPlayer,{soundtracks} from '../components/music-player';
 import RoomChat,{type RoomMessage,type Person} from '../components/room-chat';
-import RoomDrinks from '../components/room-drinks';
+import RoomCompanions from '../components/room-companions';
+import type {RoomGift,RoomLetter} from '../lib/room-companions';
 import MemeGotgan from '../components/meme-gotgan';
 import SessionRenewal,{type CafeOrder} from '../components/session-renewal';
 import {menu as drinks,matchas,beans} from '../lib/cafe';
@@ -16,6 +17,7 @@ function Cup({index,className=''}:{index:number,className?:string}){return <img 
 export default function Home(){
  const [step,setStep]=useState('entry'),[drinkIndex,setDrinkIndex]=useState(0),[picked,setPicked]=useState(false),[bean,setBean]=useState(beans[0]),[matcha,setMatcha]=useState(matchas[0]),[duration,setDuration]=useState(25),[name,setName]=useState(''),[task,setTask]=useState(''),[code,setCode]=useState(''),[joined,setJoined]=useState(false),[people,setPeople]=useState<Person[]>([]),[messages,setMessages]=useState<RoomMessage[]>([]),[seconds,setSeconds]=useState(1500),[running,setRunning]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[drawer,setDrawer]=useState(false),[soundIndex,setSoundIndex]=useState(-1),[copied,setCopied]=useState(false);
  const [receivedCount,setReceivedCount]=useState(0);
+ const [gifts,setGifts]=useState<RoomGift[]>([]),[letters,setLetters]=useState<RoomLetter[]>([]),[openedLetters,setOpenedLetters]=useState<string[]>([]),[mailboxOpen,setMailboxOpen]=useState(false);
  const [view,setView]=useState<'focus'|'memes'>('focus');
  const [renewal,setRenewal]=useState<'notice'|'order'|null>(null);
  const doorBell=useRef<HTMLAudioElement|null>(null);
@@ -26,6 +28,8 @@ export default function Home(){
  const durations=isDessert?[10,20,40]:[25,45,60];
  const selection=isCoffee?bean:isMatcha?matcha:'',drink=drinks[drinkIndex].name+(selection?' · '+selection:'');
  const friends=joined?people.filter(person=>person.id!==id.current):[];
+ const finishedRound=people.find(person=>person.id===id.current)?.finishedRound||0;
+ const readyLetters=letters.filter(letter=>letter.round<=finishedRound&&!openedLetters.includes(letter.id)).length;
  useEffect(()=>()=>{void room.current?.close().catch(()=>{})},[]);
  useEffect(()=>{
   const bell=new Audio(import.meta.env.BASE_URL+'audio/cafe-door-bell.mp3');bell.preload='auto';bell.volume=.65;bell.load();doorBell.current=bell;
@@ -36,20 +40,25 @@ export default function Home(){
   setReceivedCount(0);
   if(leaving.current)await leaving.current;
   if(room.current)await room.current.close();
-  const client=await connectRoom({code,name:name.trim()||'guest',drink,task,onPeople:setPeople,onMessages:setMessages,onStatus:setError,onIncoming:count=>setReceivedCount(current=>current+count),onReset:()=>setReceivedCount(0)});
+  const client=await connectRoom({code,name:name.trim()||'guest',drink,task,onPeople:setPeople,onMessages:setMessages,onGifts:setGifts,onLetters:setLetters,onStatus:setError,onIncoming:count=>setReceivedCount(current=>current+count),onReset:()=>{setReceivedCount(0);setGifts([]);setLetters([]);setOpenedLetters([])}});
   id.current=client.id;room.current=client;setJoined(true);setError('');
  }
  useEffect(()=>{if(!running)return;const t=setInterval(()=>setSeconds(s=>Math.max(0,s-1)),1000);return()=>clearInterval(t)},[running]);
  useEffect(()=>{if(step==='room'&&running&&seconds===0){setRunning(false);setDrawer(false);setRenewal('notice')}},[step,running,seconds]);
+ useEffect(()=>{if(step==='room'&&seconds===0&&joined)void room.current?.finishFocus().catch(e=>setError(roomError(e)))},[step,seconds,joined,error]);
+ async function resetTimer(){
+  try{if(joined&&room.current){if(seconds===0)await room.current.finishFocus();await room.current.restartFocus()}setRunning(false);setSeconds(duration*60)}catch(e){setError(roomError(e))}
+ }
  async function renewSession(order:CafeOrder){
   const item=drinks[order.index],origin=item.coffee?order.bean:item.matcha?order.matcha:'';
-  if(joined){if(!room.current)throw Error('방 연결을 확인해주세요.');await room.current.order(item.name+(origin?' · '+origin:''))}
+  if(joined){if(!room.current)throw Error('방 연결을 확인해주세요.');if(seconds===0)await room.current.finishFocus();await room.current.order(item.name+(origin?' · '+origin:''))}
   setDrinkIndex(order.index);setBean(order.bean);setMatcha(order.matcha);setDuration(order.duration);setSeconds(order.duration*60);setRunning(true);setView('focus');setRenewal(null);
  }
  async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code)await join();setSeconds(duration*60);setRunning(true);setView('focus');setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  async function leave(){
   const client=room.current;room.current=null;
   setReceivedCount(0);setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRunning(false);setRenewal(null);setStep('drink');setError('');
+  setGifts([]);setLetters([]);setOpenedLetters([]);setMailboxOpen(false);
   if(client){
    const pending=client.close().catch(e=>setError(roomError(e))).finally(()=>{if(leaving.current===pending)leaving.current=null});
    leaving.current=pending;
@@ -76,12 +85,12 @@ export default function Home(){
  {view==='memes'&&<MemeGotgan name={name}/>}
  <section className="focus-stage" id="focus-panel" role="region" aria-label="focus" hidden={view!=='focus'}><img className="room-bg" src={root+'focus-bg.png'} alt="손그림 카페 공간"/>
  <button className="space-label" onClick={()=>setDrawer(true)}>커피숍{joined?' · '+code:''}</button>
- <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomDrinks ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownSelection={selection||undefined} friends={friends}/></div>
- <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0){setRenewal('notice');return;}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>{setRunning(false);setSeconds(duration*60);}}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&<button className="done renewal-reminder" onClick={()=>setRenewal('order')}>시간이 다 됐어요 · 한 잔 더 주문하기</button>}</div>
+ <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomCompanions key={joined?id.current:'solo'} ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownSelection={selection||undefined} friends={friends} me={id.current} finishedRound={finishedRound} client={joined?room.current:null} gifts={gifts} letters={letters} mailboxOpen={mailboxOpen} onMailboxOpen={setMailboxOpen} opened={openedLetters} onRead={letterId=>setOpenedLetters(current=>current.includes(letterId)?current:[...current,letterId])}/></div>
+ <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0){setRenewal('notice');return;}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>void resetTimer()}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&<button className="done renewal-reminder" onClick={()=>setRenewal('order')}>시간이 다 됐어요 · 한 잔 더 주문하기</button>}</div>
  </section><RoomChat receivedCount={receivedCount} joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{if(!room.current)throw Error('방에 먼저 입장해주세요.');await room.current.send(body,recipient,messageId)}}/>
  {soundIndex>=0&&<MusicPlayer key={soundIndex} index={soundIndex} onClose={()=>setSoundIndex(-1)}/>}
  {error&&<div role="alert" className="room-error">{error}</div>}
- {renewal&&<SessionRenewal initial={{index:drinkIndex,bean,matcha,duration}} notice={renewal==='notice'} onClose={()=>setRenewal(null)} onOrder={renewSession}/>}
+ {renewal&&<SessionRenewal initial={{index:drinkIndex,bean,matcha,duration}} notice={renewal==='notice'} onClose={()=>setRenewal(null)} onOrder={renewSession} readyLetters={readyLetters} onOpenLetters={()=>{setRenewal(null);setMailboxOpen(true)}}/>}
  {drawer&&<div className="drawer-backdrop" onClick={()=>setDrawer(false)}><section className="drawer" onClick={e=>e.stopPropagation()}><button className="close" aria-label="닫기" onClick={()=>setDrawer(false)}><X/></button><h2>make yourself at home.</h2><p className="drawer-sub">커피 한 잔, 나의 속도로.</p><h3>background sound</h3><div className="youtube-track-list">{soundtracks.map((track,i)=><button key={track.id} aria-pressed={soundIndex===i} className={soundIndex===i?'chosen':''} onClick={()=>{setSoundIndex(i);setDrawer(false)}}><span className="track-number">0{i+1}</span><span><strong>{track.name}</strong><small>{track.detail}</small></span><span>{soundIndex===i?'✓':'↗'}</span></button>)}</div><p className="sound-player-note">YouTube 공식 플레이어에서 재생해요.<br/>모든 영상은 처음부터 시작합니다.</p>{soundIndex>=0&&<button className="stop-youtube" onClick={()=>setSoundIndex(-1)}>재생 종료</button>}<h3>together, in the same room.</h3>{joined?<><div className="room-number"><span>ROOM {code}</span><button aria-label="방 번호 복사" onClick={async()=>{try{await navigator.clipboard.writeText(code);setCopied(true)}catch{setError('방 번호를 직접 복사해주세요.')}}}><Copy size={16}/></button></div><p className="tiny-note">{copied?'번호를 복사했어요.':'친구에게 이 번호를 알려주세요.'} · {people.length}명 접속 중</p><div className="drawer-people">{people.map(p=><p key={p.id}><Users size={14}/>{p.name}<small>{p.drink}</small></p>)}</div></>:<form className="join-form" onSubmit={async e=>{e.preventDefault();setBusy(true);try{await join()}catch(e:any){setError(e.message)}finally{setBusy(false)}}}><label>방 번호<input aria-label="함께할 방 번호" required pattern="[0-9]{4,8}" maxLength={8} inputMode="numeric" placeholder="숫자 4~8자리" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></label><button className="black" disabled={busy}>{busy?'opening…':'함께 입장하기'}</button></form>}{error&&<p className="error" role="alert">{error}</p>}<button className="leave" onClick={leave}><LogOut size={16}/>{joined?'방 나가기':'처음으로'}</button></section></div>}
  </main>
 }
