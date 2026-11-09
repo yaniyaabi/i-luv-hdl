@@ -27,6 +27,16 @@ try{
  assert.ok(a.state.messages.some(m=>m.body==='SDK Bob님이 들어왔습니다.'));
  assert.equal(b.state.people.find(p=>p.id===alice.id)?.task,'수학 문제 20개 풀기','friend goal is shared');
  assert.equal(a.state.people.find(p=>p.id===bob.id)?.task,'','blank goals remain empty');
+ const bobTimer=()=>a.state.people.find(person=>person.id===bob.id)?.focusTimer;
+ await b.call('syncFocusTimer',{timer:{endsAt:Date.now()+60_000,remainingMs:0}});
+ await until(()=>bobTimer()?.endsAt>0,'running timer is visible to friends');
+ const pausedTimer={endsAt:0,remainingMs:55_321};
+ await b.call('syncFocusTimer',{timer:pausedTimer});
+ await until(()=>bobTimer()?.remainingMs===pausedTimer.remainingMs,'pausing freezes the friend countdown');
+ assert.deepEqual(bobTimer(),pausedTimer);
+ const timerPath='rooms/'+code+'/members/'+bob.id+'/focusTimer';
+ assert.equal((await a.call('rest',{path:timerPath,method:'PUT',body:{endsAt:0,remainingMs:0}})).ok,false,'another member cannot edit the timer');
+ assert.equal((await b.call('rest',{path:timerPath,method:'PUT',body:{endsAt:0,remainingMs:-1}})).ok,false,'invalid remaining time is rejected');
  const id=randomUUID();
  await a.call('send',{code,messageId:id,body:'public SDK test',recipient:''});
  await until(()=>b.state.messages.some(m=>m.id===id),'public message delivered');
@@ -49,9 +59,12 @@ try{
  assert.equal(b.state.received,2,'order announcements do not count as incoming chat');
  await b.call('offline');
  await until(()=>a.state.people.length===1,'onDisconnect removes absent member');
+ const offlineTimer={endsAt:0,remainingMs:35_000};
+ await b.call('syncFocusTimer',{timer:offlineTimer});
  await b.call('online');
  await until(()=>a.state.people.length===2&&b.state.people.length===2&&b.state.status==='','reconnect restores presence and listeners');
  assert.equal(b.state.people.find(p=>p.id===alice.id)?.task,'수학 문제 20개 풀기','goals stay visible after reconnect');
+ await until(()=>bobTimer()?.remainingMs===offlineTimer.remainingMs,'reconnect shares the latest timer state');
  const reply=randomUUID();
  await b.call('send',{code,messageId:reply,body:'back online',recipient:''});
  await until(()=>a.state.messages.some(m=>m.id===reply),'chat works after reconnect');
@@ -91,7 +104,7 @@ try{
  await b.call('online');
  await until(()=>b.state.status===''&&b.state.people.length===2,'second reconnect joins fresh session');
  assert.equal(b.state.messages.some(m=>m.kind==='chat'),false,'no stale whispers or public messages after reconnect');
- console.log('PASS: shared goals, blank-goal handling, goal persistence after ordering/reconnect; chat lifecycle and privacy; incoming public/whisper notifications; no self, duplicate, or history notifications.');
+ console.log('PASS: shared goals and timers, timer validation and reconnect, chat lifecycle and privacy, and notification deduplication.');
 }finally{
  const cleanup=[];
  await a.call('cleanup').catch(error=>cleanup.push(error));

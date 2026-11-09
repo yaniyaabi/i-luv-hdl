@@ -1,7 +1,8 @@
 'use client';
 import {useEffect,useRef,useState} from 'react';
 import {MessageCircle,Send,Users,ChevronDown,Minus,Lock} from 'lucide-react';
-export type Person={id:string,name:string,drink:string,task?:string,focusRound?:number,finishedRound?:number};
+import type {FocusTimer} from '../lib/focus-timer';
+export type Person={id:string,name:string,drink:string,task?:string,focusRound?:number,finishedRound?:number,focusTimer?:FocusTimer};
 export type RoomMessage={id:string,kind:string,sender:string,senderName:string,recipient:string,recipientName:string,body:string,created:number};
 export default function RoomChat({joined,code,me,name,people,messages,receivedCount,onSend,onJoin}:{joined:boolean,code:string,me:string,name:string,people:Person[],messages:RoomMessage[],receivedCount:number,onSend:(body:string,recipient:string,messageId:string)=>Promise<void>,onJoin:()=>void}){
  const [target,setTarget]=useState(''),[draft,setDraft]=useState(''),[sending,setSending]=useState(false),[error,setError]=useState(''),[active,setActive]=useState(false),[minimized,setMinimized]=useState(false),[showPeople,setShowPeople]=useState(false);

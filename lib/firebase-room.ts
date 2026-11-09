@@ -4,6 +4,7 @@ import {getDatabase,ref,set,get,update,remove,onValue,onDisconnect,query,orderBy
 import {firebaseConfig} from './firebase-config.ts';
 import type {Person,RoomMessage} from '../components/room-chat';
 import type {RoomGift,RoomLetter} from './room-companions';
+import type {FocusTimer} from './focus-timer';
 
 const app=initializeApp(firebaseConfig);
 const auth=initializeAuth(app,{persistence:inMemoryPersistence});
@@ -12,9 +13,9 @@ let login:Promise<string>|undefined;
 export function visitor(){
   return login ??= signInAnonymously(auth).then(({user})=>user.uid).catch(error=>{login=undefined;throw error});
 }
-type Profile={name:string,drink:string,task?:string,joinedAt:number,focusRound?:number,finishedRound?:number};
+type Profile={name:string,drink:string,task?:string,joinedAt:number,focusRound?:number,finishedRound?:number,focusTimer?:FocusTimer};
 type StoredMessage=Omit<RoomMessage,'id'>;
-type Options={code:string,name:string,drink:string,task?:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void,onGifts?:(gifts:RoomGift[])=>void,onLetters?:(letters:RoomLetter[])=>void};
+type Options={code:string,name:string,drink:string,task?:string,onPeople:(people:Person[])=>void,onMessages:(messages:RoomMessage[])=>void,onStatus:(message:string)=>void,onIncoming?:(count:number)=>void,onReset?:()=>void,onGifts?:(gifts:RoomGift[])=>void,onLetters?:(letters:RoomLetter[])=>void,onClockOffset?:(offset:number)=>void};
 
 export function roomError(error:unknown){
   const code=(error as {code?:string})?.code || '';
@@ -40,7 +41,7 @@ export async function connectRoom(options:Options){
     // Rules check this whole update against the latest server state. Clearing
     // history is allowed only for an empty room; otherwise join its live session.
     for(let attempt=0;attempt<5;attempt++){
-      const nextProfile={...profile,joinedAt:serverTimestamp()};
+      const nextProfile={...profile,joinedAt:serverTimestamp(),...(localFocusTimer&&{focusTimer:sharedFocusTimer(localFocusTimer)})};
       try{
         await update(room,{['members/'+uid]:nextProfile,...clearedHistory});
         previous=null;system=[];publicMessages=[];whispers=[];
@@ -76,6 +77,15 @@ export async function connectRoom(options:Options){
   let hasBaseline=false;
   const seenMessages=new Set<string>();
   let firstConnection=true,reconnecting=false,connected=true,lastSent=0;
+  let localFocusTimer:FocusTimer|undefined;
+  let clockOffset=0;
+  function sharedFocusTimer(timer:FocusTimer):FocusTimer{
+    return {...timer,endsAt:timer.endsAt ? Math.round(timer.endsAt+clockOffset) : 0};
+  }
+  async function publishFocusTimer(){
+    if(closed||!connected||!localFocusTimer)return;
+    await update(member,{focusTimer:sharedFocusTimer(localFocusTimer)});
+  }
   let finishedForSession=false,finishing:Promise<void>|null=null;
   const available=()=>{if(closed)throw Error('방에 다시 입장해주세요.');if(!connected)throw Error('다시 연결한 후 보내주세요.')};
   const recipientProfile=(recipient:string,messageId:string)=>{
@@ -144,7 +154,7 @@ export async function connectRoom(options:Options){
       }
       for(const [id,p] of Object.entries(previous||{}))if(!current[id])announce(p.name+'님이 나갔습니다.');
       previous=current;
-      if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink,task:p.task||'',focusRound:p.focusRound,finishedRound:p.finishedRound})));
+      if(!closed)onPeople(Object.entries(current).map(([id,p])=>({id,name:p.name,drink:p.drink,task:p.task||'',focusRound:p.focusRound,finishedRound:p.finishedRound,focusTimer:p.focusTimer})));
       emit();
     },failed));
     listeners.push(onValue(query(ref(db,base+'/messages'),orderByChild('created'),limitToLast(100)),snapshot=>{publicMessages=fromSnapshot(snapshot);trackIncoming(publicMessages,'public');emit()},failed));
@@ -162,6 +172,14 @@ export async function connectRoom(options:Options){
     await disconnect.remove();
     await enter();
     await listen();
+    unsubscribers.push(onValue(ref(db,'.info/serverTimeOffset'),snapshot=>{
+      if(closed)return;
+      const offset=Number(snapshot.val())||0;
+      const changed=offset!==clockOffset;
+      clockOffset=offset;
+      options.onClockOffset?.(offset);
+      if(changed&&localFocusTimer?.endsAt)void publishFocusTimer().catch(failed);
+    }));
     unsubscribers.push(onValue(ref(db,'.info/connected'),snapshot=>{
       if(closed)return;
       if(snapshot.val()!==true){connected=false;firstConnection=false;stopListening();onStatus('연결이 끊겼어요. 다시 연결하는 중…');return}
@@ -172,11 +190,14 @@ export async function connectRoom(options:Options){
         try{
           await disconnect.remove();
           if(closed){await disconnect.cancel();return}
+          const timerAtEntry=localFocusTimer,offsetAtEntry=clockOffset;
           await enter();
           if(closed){await depart();return}
           // Reattach only after membership exists; restored subscriptions may
           // otherwise be rejected before the presence write reaches Firebase.
-          connected=true;if(await listen())onStatus('');
+          connected=true;
+          if(timerAtEntry!==localFocusTimer||offsetAtEntry!==clockOffset)await publishFocusTimer();
+          if(await listen())onStatus('');
         }catch(error){failed(error)}finally{reconnecting=false}
       })();
     }));
@@ -188,6 +209,10 @@ export async function connectRoom(options:Options){
   }
   return {
     id:uid,
+    async syncFocusTimer(timer:FocusTimer){
+      localFocusTimer=timer;
+      await publishFocusTimer();
+    },
     finishFocus,
     async restartFocus(){await finishing;available();finishedForSession=false},
     async cookie(recipient:string,messageId:string){

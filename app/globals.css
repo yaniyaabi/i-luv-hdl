@@ -165,3 +165,6 @@ html,body,button,a,input,select,[role=button]{cursor:url('/star-cursor.png') 24 
 @keyframes cookie-arrive{from{opacity:0;transform:translateY(-22px) scale(.4) rotate(-20deg)}to{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
 @keyframes companion-toast-in{from{opacity:0;top:19px}to{opacity:1;top:26px}}
 @media(max-width:760px){.delivered-cookie{width:48px;height:45px;right:-6px;bottom:-3px}.companion-actions{gap:4px;margin-top:6px}.companion-actions button{padding:4px 6px;font-size:9px;min-height:28px}.companion-mailbox{left:12px;bottom:22px;padding:8px 10px;font-size:10px}.companion-mailbox>span{display:none}.companion-toast{top:16px;font-size:10px;width:max-content;padding:10px 12px}.companion-backdrop{padding:16px}.companion-dialog{max-height:calc(100svh - 32px)}.companion-dialog>header{padding:18px}.companion-compose,.companion-inbox{padding:18px}.companion-compose textarea{min-height:145px;font-size:22px}}
+
+.shared-focus-time{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:5px;color:#756754;font-size:11px;line-height:1.5;font-variant-numeric:tabular-nums}
+.shared-focus-time span+span{font-size:9px}

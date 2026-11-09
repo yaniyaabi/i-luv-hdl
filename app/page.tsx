@@ -8,19 +8,30 @@ import MemeGotgan from '../components/meme-gotgan';
 import SessionRenewal,{type CafeOrder} from '../components/session-renewal';
 import {menu as drinks,matchas,beans} from '../lib/cafe';
 import {connectRoom,roomError,type CafeRoom} from '../lib/firebase-room';
+import {formatFocusTime,remainingFocusMs,type FocusTimer} from '../lib/focus-timer';
 import {ArrowLeft,ArrowRight,Volume2,VolumeX,Play,Pause,Square,Users,Copy,LogOut,X,Settings2,Headphones} from 'lucide-react';
 const root=import.meta.env.BASE_URL+'reference/';
 
-
+function ringBell(bell: HTMLAudioElement | null) {
+ if (!bell) return;
+ bell.currentTime=0;
+ void bell.play().catch(()=>{});
+}
 
 function Cup({index,className=''}:{index:number,className?:string}){return <img className={'cup '+className} src={root+drinks[index].img} alt={drinks[index].ko}/>;}
 export default function Home(){
- const [step,setStep]=useState('entry'),[drinkIndex,setDrinkIndex]=useState(0),[picked,setPicked]=useState(false),[bean,setBean]=useState(beans[0]),[matcha,setMatcha]=useState(matchas[0]),[duration,setDuration]=useState(25),[name,setName]=useState(''),[task,setTask]=useState(''),[code,setCode]=useState(''),[joined,setJoined]=useState(false),[people,setPeople]=useState<Person[]>([]),[messages,setMessages]=useState<RoomMessage[]>([]),[seconds,setSeconds]=useState(1500),[running,setRunning]=useState(false),[error,setError]=useState(''),[busy,setBusy]=useState(false),[drawer,setDrawer]=useState(false),[soundIndex,setSoundIndex]=useState(-1),[copied,setCopied]=useState(false);
+ const [step,setStep]=useState('entry'),[drinkIndex,setDrinkIndex]=useState(0),[picked,setPicked]=useState(false),[bean,setBean]=useState(beans[0]),[matcha,setMatcha]=useState(matchas[0]),[duration,setDuration]=useState(25),[name,setName]=useState(''),[task,setTask]=useState(''),[code,setCode]=useState(''),[joined,setJoined]=useState(false),[people,setPeople]=useState<Person[]>([]),[messages,setMessages]=useState<RoomMessage[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[drawer,setDrawer]=useState(false),[soundIndex,setSoundIndex]=useState(-1),[copied,setCopied]=useState(false);
  const [receivedCount,setReceivedCount]=useState(0);
+ const [focusTimer,setFocusTimer]=useState<FocusTimer>({endsAt:0,remainingMs:25*60_000});
+ const [now,setNow]=useState(Date.now),[clockOffset,setClockOffset]=useState(0);
+ const running=focusTimer.endsAt>0;
+ const remainingMs=remainingFocusMs(focusTimer,now);
+ const seconds=Math.ceil(remainingMs/1000);
  const [gifts,setGifts]=useState<RoomGift[]>([]),[letters,setLetters]=useState<RoomLetter[]>([]),[openedLetters,setOpenedLetters]=useState<string[]>([]),[mailboxOpen,setMailboxOpen]=useState(false);
  const [view,setView]=useState<'focus'|'memes'>('focus');
  const [renewal,setRenewal]=useState<'notice'|'order'|null>(null);
  const doorBell=useRef<HTMLAudioElement|null>(null);
+ const rungTimer=useRef<FocusTimer|null>(null);
  const id=useRef('');
  const room=useRef<CafeRoom|null>(null);
  const leaving=useRef<Promise<void>|null>(null);
@@ -40,24 +51,67 @@ export default function Home(){
   setReceivedCount(0);
   if(leaving.current)await leaving.current;
   if(room.current)await room.current.close();
-  const client=await connectRoom({code,name:name.trim()||'guest',drink,task,onPeople:setPeople,onMessages:setMessages,onGifts:setGifts,onLetters:setLetters,onStatus:setError,onIncoming:count=>setReceivedCount(current=>current+count),onReset:()=>{setReceivedCount(0);setGifts([]);setLetters([]);setOpenedLetters([])}});
+  const client=await connectRoom({code,name:name.trim()||'guest',drink,task,onPeople:members=>{setPeople(members);setNow(Date.now())},onMessages:setMessages,onGifts:setGifts,onLetters:setLetters,onStatus:setError,onClockOffset:setClockOffset,onIncoming:count=>setReceivedCount(current=>current+count),onReset:()=>{setReceivedCount(0);setGifts([]);setLetters([]);setOpenedLetters([])}});
   id.current=client.id;room.current=client;setJoined(true);setError('');
  }
- useEffect(()=>{if(!running)return;const t=setInterval(()=>setSeconds(s=>Math.max(0,s-1)),1000);return()=>clearInterval(t)},[running]);
- useEffect(()=>{if(step==='room'&&running&&seconds===0){setRunning(false);setDrawer(false);setRenewal('notice')}},[step,running,seconds]);
+ useEffect(()=>{
+  if(step!=='room'||(!running&&!joined))return;
+  const refreshClock=()=>setNow(Date.now());
+  refreshClock();
+  const interval=setInterval(refreshClock,1000);
+  document.addEventListener('visibilitychange',refreshClock);
+  return()=>{clearInterval(interval);document.removeEventListener('visibilitychange',refreshClock)};
+ },[step,running,joined]);
+ useEffect(()=>{
+  if(step!=='room'||!running||seconds!==0||rungTimer.current===focusTimer)return;
+  rungTimer.current=focusTimer;
+  setFocusTimer({endsAt:0,remainingMs:0});
+  ringBell(doorBell.current);
+  setDrawer(false);
+  setRenewal('notice');
+ },[step,running,seconds,focusTimer]);
+ useEffect(()=>{
+  const client=room.current;
+  if(step==='room'&&joined&&client){
+   void client.syncFocusTimer(focusTimer).catch(error=>{
+    if(room.current===client)setError(roomError(error));
+   });
+  }
+ },[step,joined,focusTimer]);
  useEffect(()=>{if(step==='room'&&seconds===0&&joined)void room.current?.finishFocus().catch(e=>setError(roomError(e)))},[step,seconds,joined,error]);
  async function resetTimer(){
-  try{if(joined&&room.current){if(seconds===0)await room.current.finishFocus();await room.current.restartFocus()}setRunning(false);setSeconds(duration*60)}catch(e){setError(roomError(e))}
+  const timestamp=Date.now();
+  if(running&&remainingFocusMs(focusTimer,timestamp)===0){setNow(timestamp);return}
+  try{
+   if(joined&&room.current){if(seconds===0)await room.current.finishFocus();await room.current.restartFocus()}
+   setFocusTimer({endsAt:0,remainingMs:duration*60_000});
+  }catch(e){setError(roomError(e))}
+ }
+ function startTimer(milliseconds:number){
+  const timestamp=Date.now();
+  setNow(timestamp);
+  setFocusTimer({endsAt:timestamp+milliseconds,remainingMs:0});
+ }
+ function toggleTimer(){
+  const timestamp=Date.now();
+  const remaining=remainingFocusMs(focusTimer,timestamp);
+  if(remaining===0){
+   if(running)setNow(timestamp);
+   else setRenewal('notice');
+   return;
+  }
+  if(running)setFocusTimer({endsAt:0,remainingMs:remaining});
+  else startTimer(remaining);
  }
  async function renewSession(order:CafeOrder){
   const item=drinks[order.index],origin=item.coffee?order.bean:item.matcha?order.matcha:'';
   if(joined){if(!room.current)throw Error('방 연결을 확인해주세요.');if(seconds===0)await room.current.finishFocus();await room.current.order(item.name+(origin?' · '+origin:''))}
-  setDrinkIndex(order.index);setBean(order.bean);setMatcha(order.matcha);setDuration(order.duration);setSeconds(order.duration*60);setRunning(true);setView('focus');setRenewal(null);
+  setDrinkIndex(order.index);setBean(order.bean);setMatcha(order.matcha);setDuration(order.duration);startTimer(order.duration*60_000);setView('focus');setRenewal(null);
  }
- async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code)await join();setSeconds(duration*60);setRunning(true);setView('focus');setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
+ async function start(e:React.FormEvent){e.preventDefault();setBusy(true);try{if(code)await join();startTimer(duration*60_000);setView('focus');setStep('room')}catch(e:any){setError(e.message)}finally{setBusy(false)}}
  async function leave(){
   const client=room.current;room.current=null;
-  setReceivedCount(0);setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRunning(false);setRenewal(null);setStep('drink');setError('');
+  setReceivedCount(0);setJoined(false);setPeople([]);setMessages([]);setDrawer(false);setRenewal(null);setStep('drink');setError('');
   setGifts([]);setLetters([]);setOpenedLetters([]);setMailboxOpen(false);
   if(client){
    const pending=client.close().catch(e=>setError(roomError(e))).finally(()=>{if(leaving.current===pending)leaving.current=null});
@@ -65,11 +119,10 @@ export default function Home(){
   }
  }
  function enterCafe(){
-  const bell=doorBell.current;
-  if(bell){bell.currentTime=0;bell.play().catch(()=>{});}
+  ringBell(doorBell.current);
   setStep('drink');
  }
- const clock=String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0');
+ const clock=formatFocusTime(remainingMs);
  const Next=({onClick,label='next',disabled=false}:{onClick:()=>void,label?:string,disabled?:boolean})=><button className="black next" disabled={disabled} onClick={onClick}>{label}</button>;
  const Back=({onClick}:{onClick:()=>void})=><button className="back" onClick={onClick}>← back</button>;
  if(step==='entry')return <main className="simple-entry"><div className="entry-snow" aria-hidden="true">{Array.from({length:64},(_,i)=><span key={i} className={i%11===0?'snow-crystal':'snow-dot'} style={{left:((i*47+13)%100)+'%','--snow-size':(i%11===0?12:(i%4)+3)+'px','--snow-drift':((i*23)%100-50)+'px','--snow-opacity':.25+(i%6)*.1,animationDuration:(9+(i*7)%16)+'s',animationDelay:-(i*1.73%25)+'s'} as React.CSSProperties}>{i%11===0?'❄':''}</span>)}</div><button className="entry-picture" aria-label="커피숍 입장하기" onClick={enterCafe}><img src={root+'entry-tree.png'} alt="별과 알록달록한 장식이 달린 크리스마스트리"/></button></main>;
@@ -85,8 +138,8 @@ export default function Home(){
  {view==='memes'&&<MemeGotgan name={name}/>}
  <section className="focus-stage" id="focus-panel" role="region" aria-label="focus" hidden={view!=='focus'}><img className="room-bg" src={root+'focus-bg.png'} alt="손그림 카페 공간"/>
  <button className="space-label" onClick={()=>setDrawer(true)}>커피숍{joined?' · '+code:''}</button>
- <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomCompanions key={joined?id.current:'solo'} ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownSelection={selection||undefined} friends={friends} me={id.current} finishedRound={finishedRound} client={joined?room.current:null} gifts={gifts} letters={letters} mailboxOpen={mailboxOpen} onMailboxOpen={setMailboxOpen} opened={openedLetters} onRead={letterId=>setOpenedLetters(current=>current.includes(letterId)?current:[...current,letterId])}/></div>
- <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={()=>{if(seconds===0){setRenewal('notice');return;}setRunning(!running)}}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>void resetTimer()}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&<button className="done renewal-reminder" onClick={()=>setRenewal('order')}>시간이 다 됐어요 · 한 잔 더 주문하기</button>}</div>
+ <div className={'focus-content '+(friends.length?'has-company':'')}><div className="big-clock" aria-label="남은 시간">{clock}</div><span className="guest-name">{name||'guest'}</span>{task&&<p className="focus-task">{task}</p>}<RoomCompanions key={joined?id.current:'solo'} ownIndex={drinkIndex} ownName={name.trim()||'guest'} ownSelection={selection||undefined} friends={friends} clockNow={now+clockOffset} me={id.current} finishedRound={finishedRound} client={joined?room.current:null} gifts={gifts} letters={letters} mailboxOpen={mailboxOpen} onMailboxOpen={setMailboxOpen} opened={openedLetters} onRead={letterId=>setOpenedLetters(current=>current.includes(letterId)?current:[...current,letterId])}/></div>
+ <div className="bottom-controls"><div className="playback"><button aria-label={running?'일시정지':'집중 시작'} onClick={toggleTimer}>{running?<Pause size={18}/>:<Play size={18}/>}</button><button className="black" aria-label="타이머 초기화" onClick={()=>void resetTimer()}><Square size={16} fill="currentColor"/></button><button aria-label="소리 설정" onClick={()=>setDrawer(true)}><Settings2 size={18}/></button></div><button className="music-select-button" onClick={()=>setDrawer(true)}><Headphones size={13}/>{soundIndex<0?'choose your sound':soundtracks[soundIndex].name}</button>{seconds===0&&<button className="done renewal-reminder" onClick={()=>setRenewal('order')}>시간이 다 됐어요 · 한 잔 더 주문하기</button>}</div>
  </section><RoomChat receivedCount={receivedCount} joined={joined} code={code} me={id.current} name={name.trim()||'guest'} people={people} messages={messages} onJoin={()=>setDrawer(true)} onSend={async(body,recipient,messageId)=>{if(!room.current)throw Error('방에 먼저 입장해주세요.');await room.current.send(body,recipient,messageId)}}/>
  {soundIndex>=0&&<MusicPlayer key={soundIndex} index={soundIndex} onClose={()=>setSoundIndex(-1)}/>}
  {error&&<div role="alert" className="room-error">{error}</div>}

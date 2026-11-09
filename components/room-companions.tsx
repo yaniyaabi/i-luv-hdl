@@ -20,8 +20,8 @@ function NoteDialog({title,onClose,children,busy=false}:{title:string,onClose:()
  }}><header><Mail size={18}/><h2 id="companion-title" ref={heading} tabIndex={-1}>{title}</h2><button aria-label="쪽지 창 닫기" disabled={busy} onClick={onClose}><X size={18}/></button></header>{children}</section></div>;
 }
 
-type Props={ownIndex:number,ownName:string,ownSelection?:string,friends:Person[],me:string,finishedRound:number,client:CafeRoom|null,gifts:RoomGift[],letters:RoomLetter[],mailboxOpen:boolean,onMailboxOpen:(open:boolean)=>void,opened:string[],onRead:(id:string)=>void};
-export default function RoomCompanions({ownIndex,ownName,ownSelection,friends,me,finishedRound,client,gifts,letters,mailboxOpen,onMailboxOpen,opened,onRead}:Props){
+type Props={ownIndex:number,ownName:string,ownSelection?:string,friends:Person[],clockNow:number,me:string,finishedRound:number,client:CafeRoom|null,gifts:RoomGift[],letters:RoomLetter[],mailboxOpen:boolean,onMailboxOpen:(open:boolean)=>void,opened:string[],onRead:(id:string)=>void};
+export default function RoomCompanions({ownIndex,ownName,ownSelection,friends,clockNow,me,finishedRound,client,gifts,letters,mailboxOpen,onMailboxOpen,opened,onRead}:Props){
  const [target,setTarget]=useState<Person|null>(null),[draft,setDraft]=useState(''),[sending,setSending]=useState(false),[cookieBusy,setCookieBusy]=useState(''),[error,setError]=useState(''),[toast,setToast]=useState(''),[bodies,setBodies]=useState<Record<string,string>>({}),[opening,setOpening]=useState('');
  const noteId=useRef(''),cookieIds=useRef(new Map<string,string>()),cookiePending=useRef(false),seen=useRef(new Set<string>()),readySeen=useRef(new Set<string>());
  const ready=letters.filter(note=>note.round<=finishedRound),unread=ready.filter(note=>!opened.includes(note.id)).length;
@@ -51,7 +51,7 @@ export default function RoomCompanions({ownIndex,ownName,ownSelection,friends,me
   try{const body=await client.openLetter(note.id);setBodies(current=>({...current,[note.id]:body}));onRead(note.id)}catch(e){setError(roomError(e))}finally{setOpening('')}
  }
  return <>
-  <RoomDrinks ownIndex={ownIndex} ownName={ownName} ownSelection={ownSelection} friends={friends} ownId={me} gifts={gifts} onCookie={client?cookie:undefined} onLetter={client?person=>{setTarget(person);setDraft('');noteId.current='';setError('')}:undefined} busyRecipient={cookieBusy}/>
+  <RoomDrinks ownIndex={ownIndex} ownName={ownName} ownSelection={ownSelection} friends={friends} clockNow={clockNow} ownId={me} gifts={gifts} onCookie={client?cookie:undefined} onLetter={client?person=>{setTarget(person);setDraft('');noteId.current='';setError('')}:undefined} busyRecipient={cookieBusy}/>
   {client&&createPortal(<>
    <button className={'companion-mailbox '+(unread?'has-ready':'')} aria-label={'받은 쪽지함'+(unread?' · 열 수 있는 쪽지 '+unread+'개':'')} onClick={()=>{setError('');onMailboxOpen(true)}}><Mail size={17}/><span>쪽지함</span>{letters.length>0&&<b>{unread||letters.length}</b>}</button>
    {toast&&<div className="companion-toast" role="status">{toast}<button aria-label="알림 닫기" onClick={()=>setToast('')}><X size={13}/></button></div>}

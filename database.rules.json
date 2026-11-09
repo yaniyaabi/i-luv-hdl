@@ -29,6 +29,18 @@
             },
             "finishedRound": {
               ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000000 && (!data.exists() || newData.val() === data.val() || newData.val() === data.val()+1)"
+            },
+            "focusTimer": {
+              ".validate": "newData.hasChildren(['endsAt','remainingMs']) && (newData.child('endsAt').val() === 0 || newData.child('remainingMs').val() === 0)",
+              "endsAt": {
+                ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= now+3660000"
+              },
+              "remainingMs": {
+                ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 3600000"
+              },
+              "$other": {
+                ".validate": false
+              }
             }
           }
         },

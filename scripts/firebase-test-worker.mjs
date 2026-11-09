@@ -21,6 +21,7 @@ parentPort.on('message',async ({seq,action,...params})=>{
   else if(action==='openLetter')result=await room.openLetter(params.messageId);
   else if(action==='finishFocus')await room.finishFocus();
   else if(action==='restartFocus')await room.restartFocus();
+  else if(action==='syncFocusTimer')await room.syncFocusTimer(params.timer);
   else if(action==='rest'){
     const token=await getAuth().currentUser.getIdToken();
     const response=await fetch(firebaseConfig.databaseURL+'/'+params.path+'.json?auth='+encodeURIComponent(token),{method:params.method||'GET',headers:{'Content-Type':'application/json'},...(params.body===undefined?{}:{body:JSON.stringify(params.body)})});
