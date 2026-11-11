@@ -6,8 +6,7 @@ export const soundtracks=[
  {id:'0nNcqgLwO4I',name:'비 오는 뉴욕 커피숍',detail:'Rain · coffee shop ambience'},
  {id:'180ysvIh6kU',name:'비 오는 뉴욕 대학교',detail:'감성 playlist'},
  {id:'io-OiuM--fo',name:'내가 신채경이면 좋겠다',detail:'박퀴벌 · playlist'},
- {id:'woKx5_S1wmk',name:'그때 그 시절 카세트테이프',detail:'박퀴벌 · playlist'},
- {id:'ow6h7YonmdI',name:'11월의 크리스마스',detail:'y · K-캐롤 playlist'}
+ {id:'woKx5_S1wmk',name:'그때 그 시절 카세트테이프',detail:'박퀴벌 · playlist'}
 ];
 type AudioSettings={volume:number,muted:boolean};
 const audioKey='hdl-music-audio';
