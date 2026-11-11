@@ -7,10 +7,7 @@ export const soundtracks=[
  {id:'180ysvIh6kU',name:'비 오는 뉴욕 대학교',detail:'감성 playlist'},
  {id:'io-OiuM--fo',name:'내가 신채경이면 좋겠다',detail:'박퀴벌 · playlist'},
  {id:'woKx5_S1wmk',name:'그때 그 시절 카세트테이프',detail:'박퀴벌 · playlist'},
- {id:'ow6h7YonmdI',name:'11월의 크리스마스',detail:'y · K-캐롤 playlist'},
- {id:'VcK8T6EhQOU',name:'겨울이 더 좋아지는 케이팝 플리',detail:'감사쿠야 · 겨울 K-pop'},
- {id:'zMiG9fZYeio',name:'추워질 때쯤이면 찾아듣는 겨울 팝송',detail:'mycozypop · 겨울 playlist'},
- {id:'1-Brnulq1YU',name:'캐롤 들으면서 크리스마스 기다리는 사람?',detail:'케이팝 캐롤 · 크리스마스 playlist'}
+ {id:'ow6h7YonmdI',name:'11월의 크리스마스',detail:'y · K-캐롤 playlist'}
 ];
 type AudioSettings={volume:number,muted:boolean};
 const audioKey='hdl-music-audio';
